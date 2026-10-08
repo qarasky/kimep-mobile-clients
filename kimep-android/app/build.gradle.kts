@@ -14,19 +14,6 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
 
-// Analytics config is opt-in and never committed: set umami.host / umami.websiteId in
-// local.properties, or pass -Pumami.host=… / UMAMI_HOST env vars (CI uses secrets).
-// When empty, the app ships with analytics fully disabled (no network calls at all).
-val localProperties = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}
-fun configValue(key: String, env: String): String =
-    localProperties.getProperty(key)
-        ?: (project.findProperty(key) as String?)
-        ?: System.getenv(env)
-        ?: ""
-
 android {
     namespace = "dev.qarasky.unofficialkimep"
     compileSdk = 37
@@ -35,16 +22,9 @@ android {
         applicationId = "dev.qarasky.unofficialkimep"
         minSdk = 26
         targetSdk = 37
-        versionCode = 4
-        versionName = "1.0.0"
+        versionCode = 5
+        versionName = "1.0.1"
         vectorDrawables { useSupportLibrary = true }
-
-        buildConfigField("String", "UMAMI_HOST", "\"${configValue("umami.host", "UMAMI_HOST")}\"")
-        buildConfigField(
-            "String",
-            "UMAMI_WEBSITE_ID",
-            "\"${configValue("umami.websiteId", "UMAMI_WEBSITE_ID")}\"",
-        )
     }
 
     signingConfigs {
@@ -59,6 +39,11 @@ android {
     }
 
     buildTypes {
+        create("screenshots") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".screenshots"
+            matchingFallbacks += "debug"
+        }
         release {
             isMinifyEnabled = false
             isShrinkResources = false
@@ -89,10 +74,16 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    sourceSets {
+        getByName("screenshots").kotlin.directories.add("src/demoFixtures/java")
+        getByName("test").kotlin.directories.add("src/demoFixtures/java")
+    }
 }
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.ktor.client.mock)
+    add("screenshotsImplementation", libs.ktor.client.mock)
     implementation(platform(libs.androidx.compose.bom))
 
     implementation(libs.androidx.core.ktx)

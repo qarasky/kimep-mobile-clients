@@ -19,45 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/**
- * First-run, dismissible notice. Analytics is on by default (opt-out); this explains
- * what is collected and offers a one-tap opt-out without blocking the app.
- */
-@Composable
-fun AnalyticsFirstRunDialog(
-    onKeepEnabled: () -> Unit,
-    onOptOut: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onKeepEnabled,
-        icon = { Icon(Icons.Filled.PrivacyTip, contentDescription = null) },
-        title = { Text("Anonymous statistics") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    text = "This app collects anonymous usage statistics to see what is " +
-                        "used and what is not. It is on by default.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.height(12.dp))
-                PrivacyNoticeBody()
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onKeepEnabled) { Text("Keep on") }
-        },
-        dismissButton = {
-            TextButton(onClick = onOptOut) { Text("Turn off") }
-        },
-    )
-}
-
 @Composable
 fun PrivacyNoticeDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.PrivacyTip, contentDescription = null) },
-        title = { Text("Anonymous statistics") },
+        title = { Text("Privacy notice") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 PrivacyNoticeBody()
@@ -73,42 +40,41 @@ fun PrivacyNoticeDialog(onDismiss: () -> Unit) {
 private fun PrivacyNoticeBody() {
     Column {
         NoticeSection(
-            title = "What we collect",
+            title = "No usage tracking",
             lines = listOf(
-                "Which screens you open and which buttons you tap.",
-                "A random ID generated on this device, used to count returning users.",
-                "App version, language and screen size.",
+                "This build does not send analytics, track screens or taps, or generate a usage-tracking ID.",
+                "There is no analytics service or developer-operated account server in this build.",
             ),
         )
         NoticeSection(
-            title = "What we never collect",
+            title = "Connecting to KIMEP",
             lines = listOf(
-                "Your name, student ID, password or session.",
-                "Your grades, courses, schedule or any content you view.",
-                "Your location, contacts, or the device advertising ID.",
+                "Your student ID and password are sent directly to KIMEP's services to sign in. Your password is not saved by the app.",
+                "Your session is used to fetch your profile, grades and timetable from KIMEP.",
+                "Requests to KIMEP use HTTPS. The university controls its services and how they handle your account data.",
             ),
         )
         NoticeSection(
-            title = "Why",
+            title = "On your device",
             lines = listOf(
-                "This is a proof of concept. The data is used purely for analytics: " +
-                    "what is used, what is not, and whether people come back.",
+                "Your session and basic profile, cached timetable, reminder preferences and calculator settings are stored in the app's private storage.",
+                "Reminders are scheduled locally on your device.",
+                "Android may include stored app data in system backups, depending on your device settings.",
             ),
         )
         NoticeSection(
-            title = "Who sees it",
+            title = "Update checks",
             lines = listOf(
-                "Nobody today — it is not shared with anyone.",
-                "In the future it may be shared with KIMEP administration to inform " +
-                    "product decisions.",
+                "The app automatically checks GitHub for new releases at most once a day. You can also check manually in Settings → App updates. These requests do not include your student ID, session or grades.",
+                "KIMEP and GitHub can see normal connection information, such as your IP address, when you use their services.",
             ),
         )
         NoticeSection(
             title = "Your control",
             lines = listOf(
-                "This is on by default and you can turn it off at any time in " +
-                    "Settings → Privacy. It takes effect immediately, and turning it " +
-                    "off also forgets the random ID.",
+                "Logging out clears your saved session and timetable and cancels reminders. Other local preferences remain.",
+                "To remove all local app data, use Android Settings → Apps → this app → Storage → Clear storage.",
+                "This is an unofficial app and is not affiliated with KIMEP University.",
             ),
         )
     }

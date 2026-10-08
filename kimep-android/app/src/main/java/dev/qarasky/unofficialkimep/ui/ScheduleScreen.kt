@@ -54,8 +54,6 @@ import dev.qarasky.unofficialkimep.data.ApiDate
 import dev.qarasky.unofficialkimep.data.CalendarRepository
 import dev.qarasky.unofficialkimep.data.KimepRepository
 import dev.qarasky.unofficialkimep.data.ScheduleCache
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
-import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
 import dev.qarasky.unofficialkimep.data.model.ClassMeeting
 import dev.qarasky.unofficialkimep.data.model.FinalExam
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
@@ -92,7 +90,6 @@ fun ScheduleScreen(
     scheduleCache: ScheduleCache,
     calendarRepository: CalendarRepository,
     reminderManager: ReminderManager,
-    analytics: Analytics,
     sessionId: String,
     modifier: Modifier = Modifier,
 ) {
@@ -132,7 +129,6 @@ fun ScheduleScreen(
                     selected = !showFinals,
                     onClick = {
                         showFinals = false
-                        analytics.track(AnalyticsEvents.SCHEDULE_TAB, mapOf("tab" to "classes"))
                     },
                     label = { Text("Classes") },
                 )
@@ -140,7 +136,6 @@ fun ScheduleScreen(
                     selected = showFinals,
                     onClick = {
                         showFinals = true
-                        analytics.track(AnalyticsEvents.SCHEDULE_TAB, mapOf("tab" to "finals"))
                     },
                     label = { Text("Finals") },
                 )
@@ -153,7 +148,6 @@ fun ScheduleScreen(
                 PullToRefreshBox(
                     isRefreshing = state.refreshing,
                     onRefresh = {
-                        analytics.track(AnalyticsEvents.SCHEDULE_REFRESH)
                         viewModel.load(refresh = true)
                     },
                     modifier = Modifier.fillMaxSize(),
@@ -175,7 +169,6 @@ fun ScheduleScreen(
             CourseDetailSheet(
                 detail = selected,
                 gpa = dev.qarasky.unofficialkimep.data.model.GpaCredits(),
-                analytics = analytics,
                 onDismiss = { selected = null },
             )
         }

@@ -27,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,8 +47,6 @@ import dev.qarasky.unofficialkimep.data.CalculatorSettings
 import dev.qarasky.unofficialkimep.data.SettingsStore
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
-import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
 import dev.qarasky.unofficialkimep.data.model.AssessmentScore
 import dev.qarasky.unofficialkimep.data.model.ClassMeeting
 import dev.qarasky.unofficialkimep.data.model.FinalGrade
@@ -64,7 +61,7 @@ sealed interface CourseDetail {
 
 /**
  * Expandable bottom sheet (swipe up for full page) with per-course details
- * and a what-if GPA calculator.
+ * and grade planning for current/completed courses. Scheduled courses show metadata only.
  *
  * Score weights are not exposed by the API, so the predictor assumes
  * Midterm 1/2 at 30% each and Final at 40%. Retake modelling treats the new
@@ -75,16 +72,11 @@ sealed interface CourseDetail {
 fun CourseDetailSheet(
     detail: CourseDetail?,
     gpa: GpaCredits,
-    analytics: Analytics?,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (detail == null) return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    LaunchedEffect(detail) {
-        analytics?.track(AnalyticsEvents.COURSE_DETAIL, mapOf("kind" to kindOf(detail)))
-    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -101,16 +93,10 @@ fun CourseDetailSheet(
             when (detail) {
                 is CourseDetail.Current -> CurrentContent(detail.score, gpa)
                 is CourseDetail.Completed -> CompletedContent(detail.grade, gpa)
-                is CourseDetail.Scheduled -> ScheduledContent(detail.meeting, gpa)
+                is CourseDetail.Scheduled -> ScheduledContent(detail.meeting)
             }
         }
     }
-}
-
-private fun kindOf(detail: CourseDetail): String = when (detail) {
-    is CourseDetail.Current -> "current"
-    is CourseDetail.Completed -> "completed"
-    is CourseDetail.Scheduled -> "scheduled"
 }
 
 @Composable
@@ -166,8 +152,6 @@ private fun CurrentContent(score: AssessmentScore, gpa: GpaCredits) {
     var plan by remember(score, target) {
         mutableStateOf(apiScores.map { it ?: (required ?: 100.0) })
     }
-    var shortcut by rememberSaveable(score, target) { mutableStateOf("") }
-    var shortcutResult by rememberSaveable(score, target) { mutableStateOf<String?>(null) }
     if (remainingIndices.isNotEmpty() && feasible) {
         Text("Plan your remaining scores", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(
@@ -183,66 +167,8 @@ private fun CurrentContent(score: AssessmentScore, gpa: GpaCredits) {
                 enabled = remainingIndices.size > 1 && (required ?: 0.0) > 0.0,
                 onValue = { value ->
                     Grading.linkedScores(apiScores, targetMin, i, value.toDouble())?.let { plan = it }
-                    shortcutResult = null
                 },
             )
-        }
-        if (remainingIndices.size > 1) {
-            val next = remainingIndices.first()
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = shortcut,
-                    onValueChange = { shortcut = it.filter { c -> c.isDigit() || c == '.' }.take(6); shortcutResult = null },
-                    label = { Text("What if ${labels[next].substringBefore(" ·")} is…") },
-                    suffix = { Text("/100") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                val entered = shortcut.toDoubleOrNull()
-                TextButton(
-                    enabled = entered != null && entered in 0.0..100.0,
-                    onClick = {
-                        val value = shortcut.toDoubleOrNull() ?: return@TextButton
-                        val scenario = apiScores.toMutableList().also { it[next] = value }
-                        val balance = Grading.requiredOnRemaining(scenario, targetMin)
-                        if (balance == null) {
-                            shortcutResult = "$target is impossible with $value on ${labels[next].substringBefore(" ·")}. Try a lower goal or a higher score."
-                        } else {
-                            plan = scenario.map { it ?: balance }
-                            shortcutResult = "You need ${"%.1f".format(balance)} avg on the other remaining assessments."
-                        }
-                    },
-                ) { Text("Try it") }
-            }
-            shortcutResult?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        }
-    }
-
-    var ladderExpanded by rememberSaveable(score) { mutableStateOf(false) }
-    TextButton(onClick = { ladderExpanded = !ladderExpanded }) {
-        Text(if (ladderExpanded) "Hide grade comparison" else "Compare all grades")
-    }
-    if (ladderExpanded) {
-        Grading.scale.forEach { grade ->
-            val possible = grade.minScore <= maximum + 1e-9
-            val average = Grading.requiredOnRemaining(apiScores, grade.minScore)
-            Surface(
-                onClick = { target = grade.letter },
-                enabled = possible,
-                shape = MaterialTheme.shapes.small,
-                color = if (target == grade.letter) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                contentColor = if (possible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            ) {
-                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(grade.letter, fontWeight = FontWeight.Bold)
-                    Text(when {
-                        !possible -> "✕ Out of reach"
-                        average == null -> "Achieved"
-                        else -> "${"%.1f".format(average)} avg needed"
-                    })
-                }
-            }
         }
     }
 
@@ -330,7 +256,7 @@ private fun CompletedContent(grade: FinalGrade, gpa: GpaCredits) {
 }
 
 @Composable
-private fun ScheduledContent(meeting: ClassMeeting, gpa: GpaCredits) {
+private fun ScheduledContent(meeting: ClassMeeting) {
     SheetTitle(meeting.title, meeting.courseId)
     meeting.hall?.takeIf { it.isNotBlank() }?.let {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -353,24 +279,17 @@ private fun ScheduledContent(meeting: ClassMeeting, gpa: GpaCredits) {
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.primary,
     )
-    meeting.section?.takeIf { it.isNotBlank() }?.let {
+    val sectionAndSemester = listOfNotNull(
+        meeting.section?.takeIf { it.isNotBlank() }?.let { "Section $it" },
+        meeting.semester.takeIf { it.isNotBlank() }?.let { semesterLabel(it) },
+    ).joinToString(" · ")
+    if (sectionAndSemester.isNotBlank()) {
         Text(
-            text = "Section $it · ${semesterLabel(meeting.semester)}",
+            text = sectionAndSemester,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-
-    Text(
-        text = "What-if calculator",
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-    )
-    var hypo by rememberSaveable(meeting) { mutableStateOf("A") }
-    var credits by rememberSaveable(meeting) { mutableIntStateOf(3) }
-    GradePicker(selected = hypo, onSelect = { hypo = it })
-    CreditsStepper(credits = credits, onChange = { credits = it })
-    GpaImpact(gpa = gpa, coursePoint = Grading.pointForLetter(hypo), courseCredits = credits)
 }
 
 @Composable

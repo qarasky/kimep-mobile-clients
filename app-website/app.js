@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const REPO = "artchsh/kimep-mobile-clients";
+  const REPO = "qarasky/kimep-mobile-clients";
   const RELEASES_URL = `https://github.com/${REPO}/releases`;
   const LATEST_URL = `${RELEASES_URL}/latest`;
 

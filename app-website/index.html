@@ -24,7 +24,7 @@
     </a>
     <nav class="header__nav">
       <a href="#download">Download</a>
-      <a href="https://github.com/artchsh/kimep-mobile-clients" rel="noopener">GitHub</a>
+      <a href="https://github.com/qarasky/kimep-mobile-clients" rel="noopener">GitHub</a>
     </nav>
   </div>
 </header>
@@ -42,8 +42,8 @@
       </p>
 
       <div class="actions">
-        <a class="btn btn--primary" id="download-apk" href="https://github.com/artchsh/kimep-mobile-clients/releases/latest" rel="noopener">Download APK</a>
-        <a class="btn btn--quiet" href="https://github.com/artchsh/kimep-mobile-clients" rel="noopener">GitHub</a>
+        <a class="btn btn--primary" id="download-apk" href="https://github.com/qarasky/kimep-mobile-clients/releases/latest" rel="noopener">Download APK</a>
+        <a class="btn btn--quiet" href="https://github.com/qarasky/kimep-mobile-clients" rel="noopener">GitHub</a>
       </div>
 
       <p class="note">
@@ -51,7 +51,8 @@
       </p>
 
       <figure class="hero__shot">
-        <img src="assets/screens/schedule.png" alt="The app's schedule screen with today highlighted" width="280" />
+        <img src="assets/screens/preview/grades.png" alt="Cumulative GPA, 98 of 146 earned credits and Year 3 credit standing, using a fictional student" width="1224" height="2720" />
+        <figcaption>v1.0.1 interface · sample student data</figcaption>
       </figure>
     </div>
   </section>
@@ -62,7 +63,8 @@
       <h2>Features</h2>
       <ul class="features">
         <li><strong>Schedule</strong><span>Weekly timetable grouped by day, with today highlighted and a midterm-week notice. Opens from cache and updates in the background.</span></li>
-        <li><strong>Grades</strong><span>Cumulative GPA and credits, current-term assessment scores, and the full transcript by semester.</span></li>
+        <li><strong>Grades &amp; goals</strong><span>GPA, progress toward 146 graduation credits, current scores and your transcript. Pick a grade goal to see the required average, with linked remaining-score sliders.</span></li>
+        <li><strong>Privacy &amp; updates</strong><span>No usage tracking in v1.0.1. Read the privacy notice and check for updates whenever you want, from Settings.</span></li>
         <li><strong>Academic calendar</strong><span>The official calendar parsed into the app, for both academic years and every semester.</span></li>
         <li><strong>Final exams</strong><span>A dedicated view for the exam timetable, once the university publishes it.</span></li>
         <li><strong>Class reminders</strong><span>Notifications one hour and ten minutes before each class, plus a final-exam reminder. Each can be switched off.</span></li>
@@ -74,15 +76,18 @@
   <!-- ── screenshots ────────────────────────────────────────────────────── -->
   <section id="screenshots" class="section section--flush">
     <div class="wrap wrap--wide">
-      <h2>Screenshots</h2>
+      <h2>Inside the app</h2>
+      <p class="preview-note"><span class="preview-label">Sample data</span> The v1.0.1 interface, captured on a real phone with a fictional student enrolled in six courses (18 credits). Course metadata comes from the F2026 catalog. The demo build is not distributed.</p>
     </div>
-    <div class="wrap wrap--wide gallery" tabindex="0" aria-label="App screenshots, scroll horizontally">
-      <figure><img src="assets/screens/schedule.png" alt="Schedule screen" /><figcaption>Schedule</figcaption></figure>
-      <figure><img src="assets/screens/grades.png" alt="Grades screen" /><figcaption>Grades</figcaption></figure>
-      <figure><img src="assets/screens/calendar.png" alt="Academic calendar screen" /><figcaption>Academic calendar</figcaption></figure>
-      <figure><img src="assets/screens/finals.png" alt="Final exams screen" /><figcaption>Final exams</figcaption></figure>
-      <figure><img src="assets/screens/settings.png" alt="Reminders and privacy settings" /><figcaption>Reminders &amp; privacy</figcaption></figure>
+    <div class="wrap wrap--wide gallery" tabindex="0" aria-label="App screenshots; scroll horizontally and select an image to view full size">
+      <figure><a href="assets/screens/preview/grades.png"><img src="assets/screens/preview/grades.png" alt="Cumulative GPA and graduation progress: 98 earned credits of 146, 101 taken, Year 3 standing" width="1224" height="2720" loading="lazy" /></a><figcaption>GPA &amp; graduation progress</figcaption></figure>
+      <figure><a href="assets/screens/preview/grade-calculator.png"><img src="assets/screens/preview/grade-calculator.png" alt="Goal-first grade calculator showing 73 percent needed for a B and linked Midterm 2 and Final sliders" width="1224" height="2720" loading="lazy" /></a><figcaption>Pick a goal, get an answer</figcaption></figure>
+      <figure><a href="assets/screens/preview/schedule.png"><img src="assets/screens/preview/schedule.png" alt="Sample Fall 2026 timetable using real catalog courses, rooms and instructors" width="1224" height="2720" loading="lazy" /></a><figcaption>Your week, at a glance</figcaption></figure>
+      <figure><a href="assets/screens/preview/course-details.png"><img src="assets/screens/preview/course-details.png" alt="Business Statistical Analysis course sheet with room, instructor, meeting time and section, without a calculator" width="1224" height="2720" loading="lazy" /></a><figcaption>Just the course details</figcaption></figure>
+      <figure><a href="assets/screens/preview/settings-privacy-updates.png"><img src="assets/screens/preview/settings-privacy-updates.png" alt="Settings with no usage tracking, a privacy notice and a manual Check for updates button" width="1224" height="2720" loading="lazy" /></a><figcaption>Privacy &amp; manual updates</figcaption></figure>
+      <figure><a href="assets/screens/preview/update-check.png"><img src="assets/screens/preview/update-check.png" alt="Manual update check completed successfully with You're up to date feedback" width="1224" height="2720" loading="lazy" /></a><figcaption>Check whenever you want</figcaption></figure>
     </div>
+    <div class="wrap wrap--wide"><p class="gallery-hint">Scroll to explore · select a screenshot for the full-size image.</p></div>
   </section>
 
   <!-- ── privacy ────────────────────────────────────────────────────────── -->
@@ -90,18 +95,17 @@
     <div class="wrap">
       <h2>Privacy</h2>
       <p>
-        The app can send <strong>anonymous usage statistics</strong> — which screens are
-        opened, which buttons are tapped, and a random ID generated on your device — so the
-        developer can see what is used and what is not. It never collects your name, student
-        ID, password, session, grades, courses or anything you view, and never sends real
-        URLs.
+        v1.0.1 removes <strong>all usage tracking</strong>. The privacy notice
+        lives in Settings and explains connections to KIMEP and GitHub and data stored on
+        your device. Your account connects directly to KIMEP over HTTPS; the app does not
+        save your password.
       </p>
       <p>
-        Tracking is <strong>on by default</strong>, with a notice on first launch and a
-        one-tap opt-out in Settings. Switching it off also forgets the random ID. Nothing is
-        shared today; in the future it may be shared as aggregates with KIMEP administration.
+        <strong>v1.0.0 and earlier releases may still send anonymous usage statistics.</strong>
+        On those builds, turn off anonymous statistics in Settings → Privacy. Source changes
+        do not change installed APKs; upgrade to v1.0.1 for the tracking-free app.
       </p>
-      <p><a href="https://github.com/artchsh/kimep-mobile-clients/blob/main/docs/ANALYTICS.md" rel="noopener">Read the full analytics notes</a></p>
+      <p><a href="https://github.com/qarasky/kimep-mobile-clients/blob/main/docs/PRIVACY.md" rel="noopener">Read the full privacy notes</a></p>
     </div>
   </section>
 
@@ -137,9 +141,9 @@
       Use at your own risk.
     </p>
     <p class="footer__links">
-      <a href="https://github.com/artchsh/kimep-mobile-clients" rel="noopener">GitHub</a>
-      <a href="https://github.com/artchsh/kimep-mobile-clients/releases" rel="noopener">Releases</a>
-      <a href="https://github.com/artchsh/kimep-mobile-clients/blob/main/docs/ANALYTICS.md" rel="noopener">Analytics</a>
+      <a href="https://github.com/qarasky/kimep-mobile-clients" rel="noopener">GitHub</a>
+      <a href="https://github.com/qarasky/kimep-mobile-clients/releases" rel="noopener">Releases</a>
+      <a href="https://github.com/qarasky/kimep-mobile-clients/blob/main/docs/PRIVACY.md" rel="noopener">Privacy</a>
     </p>
     <p class="footer__fine">Built with AI assistance · DeepSeek V4.1 Flash via OpenCode.</p>
   </div>

@@ -41,8 +41,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.qarasky.unofficialkimep.data.CalendarRepository
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
-import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
 import dev.qarasky.unofficialkimep.data.model.CalendarClosure
 import dev.qarasky.unofficialkimep.data.model.CalendarEvent
 import dev.qarasky.unofficialkimep.ui.components.LoadingState
@@ -53,7 +51,6 @@ import java.time.LocalDate
 @Composable
 fun CalendarScreen(
     repository: CalendarRepository,
-    analytics: Analytics,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: CalendarViewModel = viewModel(factory = CalendarViewModel.factory(repository))
@@ -97,10 +94,6 @@ fun CalendarScreen(
                                 onClick = {
                                     yearIndex = index
                                     tabIndex = 0
-                                    analytics.track(
-                                        AnalyticsEvents.CALENDAR_FILTER,
-                                        mapOf("year" to y.id),
-                                    )
                                 },
                                 label = { Text(y.id) },
                             )
@@ -117,10 +110,6 @@ fun CalendarScreen(
                             selected = tabIndex == index,
                             onClick = {
                                 tabIndex = index
-                                analytics.track(
-                                    AnalyticsEvents.CALENDAR_FILTER,
-                                    mapOf("year" to year.id, "semester" to title),
-                                )
                             },
                             text = { Text(title) },
                         )

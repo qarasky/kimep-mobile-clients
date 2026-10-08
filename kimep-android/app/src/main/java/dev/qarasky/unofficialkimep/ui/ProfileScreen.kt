@@ -47,8 +47,6 @@ import dev.qarasky.unofficialkimep.data.ApiDate
 import dev.qarasky.unofficialkimep.data.KimepApi
 import dev.qarasky.unofficialkimep.data.KimepRepository
 import dev.qarasky.unofficialkimep.data.SessionState
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
-import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
 import dev.qarasky.unofficialkimep.vm.ProfileViewModel
 import java.time.format.DateTimeFormatter
 
@@ -56,7 +54,6 @@ import java.time.format.DateTimeFormatter
 fun ProfileScreen(
     session: SessionState.LoggedIn,
     repository: KimepRepository,
-    analytics: Analytics,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -118,7 +115,6 @@ fun ProfileScreen(
 
         OutlinedButton(
             onClick = {
-                analytics.track(AnalyticsEvents.LOGOUT)
                 onLogout()
             },
             modifier = Modifier

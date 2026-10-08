@@ -8,8 +8,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.qarasky.unofficialkimep.data.KimepRepository
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
-import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
 import dev.qarasky.unofficialkimep.data.friendlyMessage
 import kotlinx.coroutines.launch
 
@@ -20,7 +18,6 @@ data class LoginUiState(
 
 class LoginViewModel(
     private val repository: KimepRepository,
-    private val analytics: Analytics,
 ) : ViewModel() {
 
     var uiState by mutableStateOf(LoginUiState())
@@ -34,19 +31,15 @@ class LoginViewModel(
         viewModelScope.launch {
             uiState = LoginUiState(loading = true)
             repository.login(studentId, password)
-                .onSuccess {
-                    analytics.track(AnalyticsEvents.LOGIN, mapOf("result" to "success"))
-                }
                 .onFailure {
-                    analytics.track(AnalyticsEvents.LOGIN, mapOf("result" to "failure"))
                     uiState = LoginUiState(error = it.friendlyMessage())
                 }
         }
     }
 
     companion object {
-        fun factory(repository: KimepRepository, analytics: Analytics) = viewModelFactory {
-            initializer { LoginViewModel(repository, analytics) }
+        fun factory(repository: KimepRepository) = viewModelFactory {
+            initializer { LoginViewModel(repository) }
         }
     }
 }

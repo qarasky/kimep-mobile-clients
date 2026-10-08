@@ -7,28 +7,36 @@ The apps talk to the university's **old mobile user-facing APIs** — the same o
 deprecated store app used — and reproduce the useful parts (schedule, grades, academic
 calendar) with a native interface, offline caching and class reminders.
 
-[![Release](https://img.shields.io/github/v/release/artchsh/kimep-mobile-clients?include_prereleases&label=release)](https://github.com/artchsh/kimep-mobile-clients/releases/latest)
-[![Android CI](https://github.com/artchsh/kimep-mobile-clients/actions/workflows/android.yml/badge.svg)](https://github.com/artchsh/kimep-mobile-clients/actions/workflows/android.yml)
-[![Website](https://img.shields.io/badge/website-download-1D4E89)](https://artchsh.github.io/kimep-mobile-clients/)
+[![Release](https://img.shields.io/github/v/release/qarasky/kimep-mobile-clients?label=release)](https://github.com/qarasky/kimep-mobile-clients/releases/latest)
+[![Android CI](https://github.com/qarasky/kimep-mobile-clients/actions/workflows/android.yml/badge.svg)](https://github.com/qarasky/kimep-mobile-clients/actions/workflows/android.yml)
+[![Website](https://img.shields.io/badge/website-download-1D4E89)](https://qarasky.github.io/kimep-mobile-clients/)
 
-**➡️ [Download the latest APK](https://artchsh.github.io/kimep-mobile-clients/)** — a plain
+**➡️ [Download the latest APK](https://qarasky.github.io/kimep-mobile-clients/)** — a plain
 download page on GitHub Pages, or grab it straight from
-[Releases](https://github.com/artchsh/kimep-mobile-clients/releases).
+[Releases](https://github.com/qarasky/kimep-mobile-clients/releases).
+
+### Screenshots
+
+Captured on a real phone with a fictional student taking six catalog courses (18 credits).
+These screenshots show the v1.0.1 interface. The demo build is private and is not offered
+as a download.
 
 <p align="center">
-  <img src="docs/screenshots/schedule.png" width="210" alt="Schedule" />
+  <img src="docs/screenshots/updated/dark/grades.png" width="210" alt="GPA, graduation progress and credit-based year standing" />
   &nbsp;
-  <img src="docs/screenshots/grades.png" width="210" alt="Grades" />
+  <img src="docs/screenshots/updated/dark/grade-calculator.png" width="210" alt="Goal-first grade calculator and linked remaining-score sliders" />
   &nbsp;
-  <img src="docs/screenshots/calendar.png" width="210" alt="Academic calendar" />
+  <img src="docs/screenshots/updated/dark/schedule.png" width="210" alt="Sample schedule with real catalog courses" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/login.png" width="210" alt="Login" />
+  <img src="docs/screenshots/updated/dark/course-details.png" width="210" alt="Metadata-only course sheet" />
   &nbsp;
-  <img src="docs/screenshots/settings.png" width="210" alt="Reminders" />
+  <img src="docs/screenshots/updated/dark/settings-privacy-updates.png" width="210" alt="Privacy notice and manual update button in Settings" />
   &nbsp;
-  <img src="docs/screenshots/finals.png" width="210" alt="Finals" />
+  <img src="docs/screenshots/updated/dark/update-check.png" width="210" alt="Successful manual update check" />
 </p>
+
+See [all updated screenshots and the demo setup](docs/screenshots/updated/README.md).
 
 ## Features
 
@@ -41,15 +49,19 @@ download page on GitHub Pages, or grab it straight from
 - **Finals** — a Classes/Finals switch for the exam timetable (populated once the
   university publishes it).
 - **Grades** — cumulative GPA and credits, current‑term assessment scores, and the full
-  transcript grouped by semester with colour‑coded grade badges.
+  transcript grouped by semester with colour‑coded grade badges. Graduation progress uses
+  a 146-credit target; year standing is credit-based, not years enrolled.
+- **Grade goals** — choose a target, see the required average and feasibility, and explore
+  linked remaining-score plans.
+- **Manual updates** — Settings → App updates → Check for updates, alongside the automatic
+  daily check.
 - **Academic calendar** — the official PDF parsed into structured data: browse both
   academic years and all semesters, with the ongoing event marked **Now**, the next one
   **Next**, and past events dimmed. Opens scrolled to the current event.
 - **Reminders** — notifications **1 hour** and **10 minutes** before each class, plus a
   final‑exam reminder. Each is individually togglable.
-- **Anonymous analytics** — usage events (screens, taps, retention) sent to a Umami
-  instance. On by default with a one‑tap opt‑out in Settings; no personal data, no real
-  URLs. See **[docs/ANALYTICS.md](docs/ANALYTICS.md)**.
+- **Privacy** — no usage tracking in v1.0.1; the privacy notice is available
+  in Settings. See **[docs/PRIVACY.md](docs/PRIVACY.md)** for data handling and older builds.
 - **Material You** dynamic colour, light/dark theme, edge‑to‑edge.
 
 ## Tech stack
@@ -62,7 +74,7 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for how the app is put toge
 ## Repository layout
 
 ```
-app-website/            download page (GitHub Pages: artchsh.github.io/kimep-mobile-clients)
+app-website/            download page (GitHub Pages: qarasky.github.io/kimep-mobile-clients)
 kimep-android/          Android app (Gradle project)
   app/src/main/java/dev/qarasky/unofficialkimep/
     data/               models, API client, repositories, caches, notifications
@@ -77,7 +89,7 @@ docs/
   ARCHITECTURE.md       Android app architecture
   RELEASING.md          how to cut a release (CI signs automatically)
   DEVICE_SUPPORT.md     supported OS/ABIs/form factors and known limitations
-  ANALYTICS.md          anonymous analytics (Umami): default-on opt-out flow
+  PRIVACY.md            data handling, local storage, and older-build privacy notes
 tools/
   parse_calendar.py     KIMEP calendar PDF -> calendar.json
 capture.py              mitmproxy addon used during reverse engineering
@@ -160,16 +172,16 @@ academic year:
 python3 tools/parse_calendar.py     # needs poppler (pdftotext)
 ```
 
-## Privacy & analytics
+## Privacy
 
-Analytics runs only when a Umami host is configured at build time. When it is, tracking is
-**on by default** with a dismissible first‑run notice and a one‑tap opt‑out in
-**Settings → Privacy**; turning it off also forgets the random ID.
+v1.0.1 contains no usage analytics, tracking client or first-run privacy
+prompt. **Settings → Privacy → Privacy notice** explains connections to KIMEP and GitHub,
+on-device storage, and how to clear your data. Account requests use KIMEP's HTTPS API;
+passwords are not saved by the app.
 
-It collects only anonymous usage events — which screens are opened, which controls are
-tapped, and a random on‑device ID used to measure retention. It never collects names,
-student IDs, passwords, sessions, grades, courses or any content you view, and it never
-sends real URLs. Full details and the event list: **[docs/ANALYTICS.md](docs/ANALYTICS.md)**.
+**Released v1.0.0 and earlier builds may still send anonymous usage statistics.** Those
+builds retain their Settings → Privacy opt-out. Removing tracking from the source does
+not change an already installed APK. Full details: **[docs/PRIVACY.md](docs/PRIVACY.md)**.
 
 ## Disclaimer
 

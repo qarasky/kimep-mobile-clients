@@ -51,12 +51,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.qarasky.unofficialkimep.data.KimepRepository
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
 import dev.qarasky.unofficialkimep.vm.LoginViewModel
 
 @Composable
-fun LoginScreen(repository: KimepRepository, analytics: Analytics) {
-    val viewModel: LoginViewModel = viewModel(factory = LoginViewModel.factory(repository, analytics))
+fun LoginScreen(repository: KimepRepository) {
+    val viewModel: LoginViewModel = viewModel(factory = LoginViewModel.factory(repository))
     val state = viewModel.uiState
 
     var studentId by rememberSaveable { mutableStateOf("") }

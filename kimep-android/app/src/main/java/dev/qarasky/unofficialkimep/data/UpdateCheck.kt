@@ -15,15 +15,14 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.CancellationException
 
 /**
  * Checks GitHub releases for a newer app version.
  *
- * Uses the releases *list* (not `/releases/latest`) because all releases so
- * far are prereleases, which `/latest` skips (it 404s when no stable release
- * exists). Users on a prerelease build are offered prereleases; users on a
- * stable build are only offered stable releases. Failures are swallowed —
- * the check must never block app start.
+ * Uses the releases list so prerelease builds can also see prereleases.
+ * Stable builds are only offered stable releases. Automatic checks are silent
+ * on failure; manual checks receive an explicit result for Settings feedback.
  */
 object UpdateCheck {
     const val OWNER = "qarasky"
@@ -46,7 +45,17 @@ object UpdateCheck {
 
     data class AppUpdate(val tag: String, val url: String)
 
-    suspend fun latestNewerThan(currentVersion: String): AppUpdate? {
+    sealed interface Result {
+        data class Available(val update: AppUpdate) : Result
+        data object UpToDate : Result
+        data object Failed : Result
+    }
+
+    suspend fun latestNewerThan(currentVersion: String): AppUpdate? =
+        (checkForUpdates(currentVersion) as? Result.Available)?.update
+
+    /** Manual callers bypass the automatic daily throttle and dismissed-version state. */
+    suspend fun checkForUpdates(currentVersion: String): Result {
         val client = HttpClient(OkHttp) {
             expectSuccess = false
             install(ContentNegotiation) { json(json) }
@@ -57,22 +66,32 @@ object UpdateCheck {
             }
         }
         try {
+            return checkForUpdates(currentVersion, client)
+        } finally {
+            client.close()
+        }
+    }
+
+    internal suspend fun checkForUpdates(currentVersion: String, client: HttpClient): Result {
+        try {
             val response = client.get(API_URL) {
                 accept(ContentType.Application.Json)
                 header(HttpHeaders.UserAgent, "UnofficialKimepApp (Android)")
             }
-            if (!response.status.isSuccess()) return null
+            if (!response.status.isSuccess()) return Result.Failed
             val releases: List<GithubRelease> = response.body()
             val currentIsPre = isPrerelease(currentVersion)
-            return releases
+            val newest = releases
                 .filter { !it.draft && it.tag.isNotBlank() }
                 .filter { currentIsPre || !it.prerelease }
-                .firstOrNull { compareVersions(it.tag, currentVersion) > 0 }
-                ?.let { AppUpdate(it.tag, it.url.ifBlank { RELEASES_PAGE }) }
+                .filter { compareVersions(it.tag, currentVersion) > 0 }
+                .maxWithOrNull { a, b -> compareVersions(a.tag, b.tag) }
+            return if (newest == null) Result.UpToDate
+            else Result.Available(AppUpdate(newest.tag, newest.url.ifBlank { RELEASES_PAGE }))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
-            return null
-        } finally {
-            client.close()
+            return Result.Failed
         }
     }
 

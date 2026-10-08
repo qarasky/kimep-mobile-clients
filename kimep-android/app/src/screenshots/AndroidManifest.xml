@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application android:label="KIMEP Demo" android:allowBackup="false" tools:replace="android:label,android:allowBackup">
+        <activity android:name=".MainActivity" tools:node="remove" />
+        <receiver android:name=".data.notify.BootReceiver" tools:node="remove" />
+        <activity
+            android:name=".screenshots.DemoActivity"
+            android:exported="true"
+            android:theme="@style/Theme.KimepMobile">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

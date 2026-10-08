@@ -30,28 +30,7 @@ import kotlinx.serialization.json.Json
  * Every request is a JSON POST with the session GUID in the body as "id"; there is no
  * Authorization header. See docs/KIMEP_Mobile_API.md.
  */
-class KimepApi {
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-    }
-
-    internal val http: HttpClient = HttpClient(OkHttp) {
-        expectSuccess = false
-        install(ContentNegotiation) { json(json) }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 30_000
-            connectTimeoutMillis = 15_000
-            socketTimeoutMillis = 30_000
-        }
-        defaultRequest {
-            url(BASE_URL)
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-        }
-    }
+class KimepApi(internal val http: HttpClient = defaultClient()) {
 
     internal suspend inline fun <reified Req, reified Res> post(path: String, body: Req): Res {
         val response = http.post(path) { setBody(body) }
@@ -84,6 +63,27 @@ class KimepApi {
 
     companion object {
         const val BASE_URL = "https://www.kimep.kz/ext/mobile/"
+
+        private fun defaultClient(): HttpClient = HttpClient(OkHttp) {
+            expectSuccess = false
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                    explicitNulls = false
+                })
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 30_000
+                connectTimeoutMillis = 15_000
+                socketTimeoutMillis = 30_000
+            }
+            defaultRequest {
+                url(BASE_URL)
+                contentType(ContentType.Application.Json)
+                accept(ContentType.Application.Json)
+            }
+        }
 
         fun avatarUrl(id: String): String =
             "${BASE_URL}avatar/thumb/$id?width=400&height=400"

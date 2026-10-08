@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -41,33 +43,26 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.qarasky.unofficialkimep.data.ReminderSettings
 import dev.qarasky.unofficialkimep.data.SettingsStore
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
-import dev.qarasky.unofficialkimep.data.analytics.AnalyticsStore
-import dev.qarasky.unofficialkimep.data.analytics.ConsentState
+import dev.qarasky.unofficialkimep.BuildConfig
+import dev.qarasky.unofficialkimep.data.UpdateCheck
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
 import dev.qarasky.unofficialkimep.vm.SettingsViewModel
+import dev.qarasky.unofficialkimep.vm.ManualUpdateState
 
 @Composable
 fun SettingsScreen(
     settingsStore: SettingsStore,
     reminderManager: ReminderManager,
-    analyticsStore: AnalyticsStore,
-    analytics: Analytics,
-    analyticsEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: SettingsViewModel = viewModel(
         factory = SettingsViewModel.factory(
             settingsStore,
             reminderManager,
-            analyticsStore,
-            analytics,
         ),
     )
     val settings by viewModel.settings
         .collectAsStateWithLifecycle(initialValue = ReminderSettings())
-    val consent by viewModel.consent
-        .collectAsStateWithLifecycle(initialValue = ConsentState.Undecided)
 
     var showNotice by remember { mutableStateOf(false) }
 
@@ -124,42 +119,90 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 4.dp),
         )
 
-        if (analyticsEnabled) {
-            Spacer(Modifier.height(24.dp))
-            Text(
-                text = "Privacy",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-            )
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
-            ) {
-                SettingSwitch(
-                    title = "Share anonymous statistics",
-                    subtitle = "Which screens you open and buttons you tap, tied to a " +
-                        "random device ID. No personal data, ever.",
-                    checked = consent == ConsentState.Granted,
-                    onCheckedChange = viewModel::setAnalyticsConsent,
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = "Privacy",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("No usage tracking", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "This build does not collect analytics or track screens and taps. " +
+                        "Your account connects directly to KIMEP's student services.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                TextButton(
-                    onClick = { showNotice = true },
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                ) {
-                    Text("Read the privacy notice")
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = { showNotice = true }) {
+                    Text("Privacy notice")
                 }
             }
         }
 
         Spacer(Modifier.height(24.dp))
+        Text(
+            text = "App updates",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Automatic checks run at most once a day. Check manually anytime.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                val checking = viewModel.updateState == ManualUpdateState.Checking
+                Button(onClick = viewModel::checkForUpdates, enabled = !checking) {
+                    if (checking) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text("Checking…", modifier = Modifier.padding(start = 8.dp))
+                    } else {
+                        Text("Check for updates")
+                    }
+                }
+                val result = (viewModel.updateState as? ManualUpdateState.Finished)?.result
+                when (result) {
+                    UpdateCheck.Result.UpToDate -> Text(
+                        "You're up to date. No newer release is available.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    UpdateCheck.Result.Failed -> Text(
+                        "Couldn't check for updates. Check your connection and try again.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    else -> Unit
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
     }
 
     if (showNotice) {
         PrivacyNoticeDialog(onDismiss = { showNotice = false })
+    }
+    val result = (viewModel.updateState as? ManualUpdateState.Finished)?.result
+    if (result is UpdateCheck.Result.Available) {
+        UpdateDialog(update = result.update, onDismiss = viewModel::dismissUpdate)
     }
 }
 

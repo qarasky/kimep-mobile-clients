@@ -42,8 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.qarasky.unofficialkimep.data.BachelorProgress
 import dev.qarasky.unofficialkimep.data.KimepRepository
-import dev.qarasky.unofficialkimep.data.analytics.Analytics
-import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
 import dev.qarasky.unofficialkimep.data.model.AssessmentScore
 import dev.qarasky.unofficialkimep.data.model.FinalGrade
 import dev.qarasky.unofficialkimep.data.model.GpaCredits
@@ -54,7 +52,6 @@ import dev.qarasky.unofficialkimep.vm.GradesViewModel
 @Composable
 fun GradesScreen(
     repository: KimepRepository,
-    analytics: Analytics,
     sessionId: String,
     modifier: Modifier = Modifier,
 ) {
@@ -83,7 +80,6 @@ fun GradesScreen(
                     selected = tab == 0,
                     onClick = {
                         tab = 0
-                        analytics.track(AnalyticsEvents.GRADES_TAB, mapOf("tab" to "current"))
                     },
                     text = { Text("Current") },
                 )
@@ -91,7 +87,6 @@ fun GradesScreen(
                     selected = tab == 1,
                     onClick = {
                         tab = 1
-                        analytics.track(AnalyticsEvents.GRADES_TAB, mapOf("tab" to "transcript"))
                     },
                     text = { Text("Transcript") },
                 )
@@ -109,7 +104,6 @@ fun GradesScreen(
             CourseDetailSheet(
                 detail = selected,
                 gpa = state.gpa,
-                analytics = analytics,
                 onDismiss = { selected = null },
             )
         }
