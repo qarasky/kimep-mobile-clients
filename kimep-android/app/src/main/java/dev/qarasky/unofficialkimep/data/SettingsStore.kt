@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.doublePreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +21,8 @@ data class ReminderSettings(
     val finalReminders: Boolean = true,
 )
 
+data class CalculatorSettings(val gpa: Double? = null, val creditsTaken: Int? = null)
+
 class SettingsStore(private val context: Context) {
 
     private object Keys {
@@ -27,6 +31,8 @@ class SettingsStore(private val context: Context) {
         val FINALS = booleanPreferencesKey("final_reminders")
         val SCHEDULED = stringSetPreferencesKey("scheduled_meeting_ids")
         val SCHEDULED_FINALS = stringSetPreferencesKey("scheduled_final_ids")
+        val CALCULATOR_GPA = doublePreferencesKey("calculator_gpa")
+        val CALCULATOR_CREDITS = intPreferencesKey("calculator_credits")
     }
 
     val settings: Flow<ReminderSettings> = context.settingsDataStore.data.map { prefs ->
@@ -38,6 +44,25 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun current(): ReminderSettings = settings.first()
+
+    val calculatorSettings: Flow<CalculatorSettings> = context.settingsDataStore.data.map {
+        CalculatorSettings(it[Keys.CALCULATOR_GPA], it[Keys.CALCULATOR_CREDITS])
+    }
+
+    suspend fun setCalculatorSettings(gpa: Double, creditsTaken: Int) {
+        require(gpa in 0.0..4.33 && creditsTaken >= 0)
+        context.settingsDataStore.edit {
+            it[Keys.CALCULATOR_GPA] = gpa
+            it[Keys.CALCULATOR_CREDITS] = creditsTaken
+        }
+    }
+
+    suspend fun resetCalculatorSettings() {
+        context.settingsDataStore.edit {
+            it.remove(Keys.CALCULATOR_GPA)
+            it.remove(Keys.CALCULATOR_CREDITS)
+        }
+    }
 
     suspend fun setLessonReminderHour(enabled: Boolean) {
         context.settingsDataStore.edit { it[Keys.LESSON_HOUR] = enabled }

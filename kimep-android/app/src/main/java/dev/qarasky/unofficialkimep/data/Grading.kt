@@ -83,6 +83,33 @@ object Grading {
         }
         if (remainingWeight <= 0.0) return null
         val needed = (targetAvg - knownPoints) / remainingWeight
-        return if (needed > 100.0) null else needed.coerceAtLeast(0.0)
+        return if (needed > 100.0 + 1e-9) null else needed.coerceIn(0.0, 100.0)
+    }
+
+    /** Best possible overall with every ungraded assessment scored at 100. */
+    fun maximumOverall(scores: List<Double?>): Double {
+        require(scores.size == 3) { "scores must be size 3" }
+        return scores.mapIndexed { i, score -> (score ?: 100.0) * assessmentWeights[i] }.sum()
+    }
+
+    /**
+     * Keep the target fixed while adjusting one remaining score. Clamp the edited
+     * score to its feasible range and distribute the balance uniformly to the rest.
+     * Returns null for an unreachable target or an already graded assessment.
+     */
+    fun linkedScores(scores: List<Double?>, targetAvg: Double, index: Int, value: Double): List<Double>? {
+        require(scores.size == 3) { "scores must be size 3" }
+        require(index in scores.indices) { "invalid assessment index" }
+        if (scores[index] != null || requiredOnRemaining(scores, targetAvg) == null) return null
+        val known = scores.mapIndexed { i, score -> (score ?: 0.0) * assessmentWeights[i] }.sum()
+        val needed = (targetAvg - known).coerceAtLeast(0.0)
+        val weight = assessmentWeights[index]
+        val otherWeight = scores.indices.filter { it != index && scores[it] == null }
+            .sumOf { assessmentWeights[it] }
+        val minimum = ((needed - otherWeight * 100.0) / weight).coerceIn(0.0, 100.0)
+        val maximum = (needed / weight).coerceIn(minimum, 100.0)
+        val adjusted = value.coerceIn(minimum, maximum)
+        val otherScore = if (otherWeight > 0.0) ((needed - adjusted * weight) / otherWeight).coerceIn(0.0, 100.0) else 0.0
+        return scores.mapIndexed { i, score -> score ?: if (i == index) adjusted else otherScore }
     }
 }

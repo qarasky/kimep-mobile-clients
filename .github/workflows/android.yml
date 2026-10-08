@@ -61,6 +61,10 @@ jobs:
             "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
           echo "Keystore written."
 
+      - name: Run unit tests
+        working-directory: kimep-android
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
       - name: Build debug
         working-directory: kimep-android
         env:

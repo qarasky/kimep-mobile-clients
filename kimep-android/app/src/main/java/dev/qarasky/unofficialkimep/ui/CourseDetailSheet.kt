@@ -2,12 +2,10 @@ package dev.qarasky.unofficialkimep.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +16,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -30,19 +29,25 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.qarasky.unofficialkimep.data.ApiDate
 import dev.qarasky.unofficialkimep.data.Grading
+import dev.qarasky.unofficialkimep.data.CalculatorSettings
+import dev.qarasky.unofficialkimep.data.SettingsStore
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import dev.qarasky.unofficialkimep.data.analytics.Analytics
 import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
 import dev.qarasky.unofficialkimep.data.model.AssessmentScore
@@ -61,8 +66,8 @@ sealed interface CourseDetail {
  * Expandable bottom sheet (swipe up for full page) with per-course details
  * and a what-if GPA calculator.
  *
- * Score weights are not exposed by the API, so the predictor assumes equal
- * weights (overall = mean of Score1/2/3). Retake modelling treats the new
+ * Score weights are not exposed by the API, so the predictor assumes
+ * Midterm 1/2 at 30% each and Final at 40%. Retake modelling treats the new
  * grade as additional credits — replacement policies are not modelled.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,14 +128,6 @@ private fun SheetTitle(title: String, subtitle: String?) {
 @Composable
 private fun CurrentContent(score: AssessmentScore, gpa: GpaCredits) {
     SheetTitle(score.title ?: "Course", score.code)
-    score.finalAssessment?.takeIf { it.isNotBlank() }?.let {
-        Text(
-            text = "Final assessment: $it",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
-
     val labels = listOf("Midterm 1 · 30%", "Midterm 2 · 30%", "Final · 40%")
     val apiScores = remember(score) {
         listOf(score.score1, score.score2, score.score3)
@@ -150,69 +147,160 @@ private fun CurrentContent(score: AssessmentScore, gpa: GpaCredits) {
         )
     }
 
-    var guess1 by rememberSaveable(score) { mutableFloatStateOf(75f) }
-    var guess2 by rememberSaveable(score) { mutableFloatStateOf(75f) }
-    var guess3 by rememberSaveable(score) { mutableFloatStateOf(75f) }
-    fun guessFor(i: Int): Float = when (i) {
-        0 -> guess1
-        1 -> guess2
-        else -> guess3
+    val maximum = Grading.maximumOverall(apiScores)
+    var target by rememberSaveable(score) {
+        mutableStateOf(Grading.gradeForScore(if (remainingIndices.isEmpty()) maximum else minOf(73.0, maximum)).letter)
     }
-    fun setGuess(i: Int, v: Float) = when (i) {
-        0 -> guess1 = v
-        1 -> guess2 = v
-        else -> guess3 = v
-    }
+    val targetMin = Grading.minScoreForLetter(target)
+    val required = Grading.requiredOnRemaining(apiScores, targetMin)
+    val feasible = targetMin <= maximum + 1e-9
+    Text("What grade do you want?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    GradePicker(
+        selected = target,
+        onSelect = { target = it },
+        isEnabled = { Grading.minScoreForLetter(it) <= maximum + 1e-9 },
+    )
+    GoalAnswer(target, required, maximum, remainingIndices.isEmpty(), feasible)
 
-    if (remainingIndices.isNotEmpty()) {
+    // Goal changes reset the plan; a slider edit keeps the weighted goal fixed.
+    var plan by remember(score, target) {
+        mutableStateOf(apiScores.map { it ?: (required ?: 100.0) })
+    }
+    var shortcut by rememberSaveable(score, target) { mutableStateOf("") }
+    var shortcutResult by rememberSaveable(score, target) { mutableStateOf<String?>(null) }
+    if (remainingIndices.isNotEmpty() && feasible) {
+        Text("Plan your remaining scores", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(
-            text = "Try remaining scores",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+            if (remainingIndices.size > 1) "Linked to $target: lower one score and the others rise. Scores stop at the feasible limits."
+            else "Only ${labels[remainingIndices.first()].substringBefore(" ·")} remains; this is the minimum score you need.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         remainingIndices.forEach { i ->
             ScoreSlider(
-                label = "Assessment ${i + 1} (${labels[i].substringAfter("· ")})",
-                value = guessFor(i),
-                onValue = { setGuess(i, it) },
+                label = labels[i],
+                value = plan[i].toFloat(),
+                enabled = remainingIndices.size > 1 && (required ?: 0.0) > 0.0,
+                onValue = { value ->
+                    Grading.linkedScores(apiScores, targetMin, i, value.toDouble())?.let { plan = it }
+                    shortcutResult = null
+                },
             )
+        }
+        if (remainingIndices.size > 1) {
+            val next = remainingIndices.first()
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = shortcut,
+                    onValueChange = { shortcut = it.filter { c -> c.isDigit() || c == '.' }.take(6); shortcutResult = null },
+                    label = { Text("What if ${labels[next].substringBefore(" ·")} is…") },
+                    suffix = { Text("/100") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                val entered = shortcut.toDoubleOrNull()
+                TextButton(
+                    enabled = entered != null && entered in 0.0..100.0,
+                    onClick = {
+                        val value = shortcut.toDoubleOrNull() ?: return@TextButton
+                        val scenario = apiScores.toMutableList().also { it[next] = value }
+                        val balance = Grading.requiredOnRemaining(scenario, targetMin)
+                        if (balance == null) {
+                            shortcutResult = "$target is impossible with $value on ${labels[next].substringBefore(" ·")}. Try a lower goal or a higher score."
+                        } else {
+                            plan = scenario.map { it ?: balance }
+                            shortcutResult = "You need ${"%.1f".format(balance)} avg on the other remaining assessments."
+                        }
+                    },
+                ) { Text("Try it") }
+            }
+            shortcutResult?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
         }
     }
 
-    val effective = List(3) { i -> apiScores[i] ?: guessFor(i).toDouble() }
-    val overall = Grading.weightedAverage(effective[0], effective[1], effective[2])
-    val projected = Grading.gradeForScore(overall)
-
-    ResultRow(
-        overall = overall,
-        letter = projected.letter,
-        point = projected.point,
-    )
-
-    var target by rememberSaveable(score) { mutableStateOf(projected.letter) }
-    GradePicker(selected = target, onSelect = { target = it })
-
-    val targetMin = Grading.minScoreForLetter(target)
-    val required = Grading.requiredOnRemaining(apiScores, targetMin)
-    Text(
-        text = when {
-            remainingIndices.isEmpty() && overall >= targetMin ->
-                "Target $target met with current scores."
-            remainingIndices.isEmpty() ->
-                "Target $target not met — all assessments are graded."
-            required == null ->
-                "Target $target is out of reach (would need over 100 on remaining)."
-            else ->
-                "Need ${"%.1f".format(required)} avg on remaining to reach $target (needs $targetMin overall)."
-        },
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    var ladderExpanded by rememberSaveable(score) { mutableStateOf(false) }
+    TextButton(onClick = { ladderExpanded = !ladderExpanded }) {
+        Text(if (ladderExpanded) "Hide grade comparison" else "Compare all grades")
+    }
+    if (ladderExpanded) {
+        Grading.scale.forEach { grade ->
+            val possible = grade.minScore <= maximum + 1e-9
+            val average = Grading.requiredOnRemaining(apiScores, grade.minScore)
+            Surface(
+                onClick = { target = grade.letter },
+                enabled = possible,
+                shape = MaterialTheme.shapes.small,
+                color = if (target == grade.letter) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                contentColor = if (possible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(grade.letter, fontWeight = FontWeight.Bold)
+                    Text(when {
+                        !possible -> "✕ Out of reach"
+                        average == null -> "Achieved"
+                        else -> "${"%.1f".format(average)} avg needed"
+                    })
+                }
+            }
+        }
+    }
 
     var credits by rememberSaveable(score) { mutableIntStateOf(3) }
-    CreditsStepper(credits = credits, onChange = { credits = it })
-    GpaImpact(gpa = gpa, coursePoint = projected.point, courseCredits = credits)
-    AssumptionNote("Weights: Midterm 1 · 30%, Midterm 2 · 30%, Final · 40%.")
+    GpaImpact(
+        gpa = gpa,
+        coursePoint = if (remainingIndices.isEmpty()) Grading.gradeForScore(maximum).point else Grading.pointForLetter(target),
+        courseCredits = credits,
+        onCreditsChange = { credits = it },
+    )
+    AssumptionNote("Assumed weights: Midterm 1 · 30%, Midterm 2 · 30%, Final · 40%. Goals are minimum overall scores.")
+}
+
+@Composable
+private fun GoalAnswer(target: String, required: Double?, maximum: Double, complete: Boolean, feasible: Boolean) {
+    val tough = (required ?: 0.0) >= 85.0
+    val background = when {
+        !feasible -> MaterialTheme.colorScheme.errorContainer
+        tough -> Color(0xFFFFE3A3)
+        else -> Color(0xFFCEEFDC)
+    }
+    val foreground = when {
+        !feasible -> MaterialTheme.colorScheme.onErrorContainer
+        tough -> Color(0xFF5B3B00)
+        else -> Color(0xFF123C29)
+    }
+    Surface(color = background, contentColor = foreground, shape = MaterialTheme.shapes.large) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("To reach $target", style = MaterialTheme.typography.titleMedium)
+            Text(
+                when {
+                    !feasible -> "Out of reach"
+                    complete -> "Goal met"
+                    else -> "${"%.1f".format(required ?: 0.0)}%"
+                },
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+            )
+            if (!complete && feasible) Text("weighted average needed on remaining assessments")
+            Surface(color = foreground.copy(alpha = 0.12f), contentColor = foreground, shape = MaterialTheme.shapes.small) {
+                Text(
+                    when {
+                        !feasible -> "Impossible"
+                        complete -> "Achieved"
+                        tough -> "Tough · 85%+ needed"
+                        else -> "Comfortable · under 85% needed"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+            Text(
+                if (complete) "All assessments graded · overall ${"%.1f".format(maximum)}%"
+                else "Maximum possible: ${"%.1f".format(maximum)}% · ${Grading.gradeForScore(maximum).letter}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
 }
 
 @Composable
@@ -286,7 +374,7 @@ private fun ScheduledContent(meeting: ClassMeeting, gpa: GpaCredits) {
 }
 
 @Composable
-private fun ScoreSlider(label: String, value: Float, onValue: (Float) -> Unit) {
+private fun ScoreSlider(label: String, value: Float, enabled: Boolean = true, onValue: (Float) -> Unit) {
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -294,7 +382,7 @@ private fun ScoreSlider(label: String, value: Float, onValue: (Float) -> Unit) {
         ) {
             Text(text = label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Text(
-                text = "%.0f".format(value),
+                text = "%.1f".format(value),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
@@ -304,22 +392,27 @@ private fun ScoreSlider(label: String, value: Float, onValue: (Float) -> Unit) {
             value = value,
             onValueChange = onValue,
             valueRange = 0f..100f,
+            enabled = enabled,
         )
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GradePicker(selected: String, onSelect: (String) -> Unit) {
-    FlowRow(
+private fun GradePicker(selected: String, onSelect: (String) -> Unit, isEnabled: (String) -> Boolean = { true }) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Grading.letters.forEach { letter ->
             FilterChip(
                 selected = letter.equals(selected, ignoreCase = true),
                 onClick = { onSelect(letter) },
-                label = { Text(letter) },
+                enabled = isEnabled(letter),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                label = { Text(letter, fontWeight = if (letter == selected) FontWeight.Bold else FontWeight.Normal) },
             )
         }
     }
@@ -344,86 +437,90 @@ private fun CreditsStepper(credits: Int, onChange: (Int) -> Unit) {
 }
 
 @Composable
-private fun GpaImpact(gpa: GpaCredits, coursePoint: Double, courseCredits: Int) {
-    var baseGpaText by rememberSaveable(gpa) { mutableStateOf(if (gpa.gpa > 0) "%.2f".format(gpa.gpa) else "") }
-    var baseCreditsText by rememberSaveable(gpa) {
-        mutableStateOf(if (gpa.creditsTaken > 0) "${gpa.creditsTaken}" else "")
-    }
-    val baseGpa = baseGpaText.toDoubleOrNull() ?: 0.0
-    val baseCredits = baseCreditsText.toIntOrNull() ?: 0
+private fun GpaImpact(
+    gpa: GpaCredits,
+    coursePoint: Double,
+    courseCredits: Int,
+    onCreditsChange: ((Int) -> Unit)? = null,
+) {
+    val context = LocalContext.current.applicationContext
+    val store = remember(context) { SettingsStore(context) }
+    val settings by store.calculatorSettings.collectAsStateWithLifecycle(initialValue = CalculatorSettings())
+    val scope = rememberCoroutineScope()
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val baseGpa = settings.gpa ?: gpa.gpa
+    val baseCredits = settings.creditsTaken ?: gpa.creditsTaken
+    var baseGpaText by rememberSaveable(baseGpa) { mutableStateOf(baseGpa.toString()) }
+    var baseCreditsText by rememberSaveable(baseCredits) { mutableStateOf(baseCredits.toString()) }
     val projected = Grading.projectedGpa(baseGpa, baseCredits, coursePoint, courseCredits)
     val delta = projected - baseGpa
 
     Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedTextField(
-                    value = baseGpaText,
-                    onValueChange = { baseGpaText = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Current GPA") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedTextField(
-                    value = baseCreditsText,
-                    onValueChange = { baseCreditsText = it.filter { c -> c.isDigit() }.take(4) },
-                    label = { Text("Credits") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
+            TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "GPA ${"%.2f".format(baseGpa)} → ${"%.2f".format(projected)} (%+.2f) · %d cr · %s".format(
+                        delta, courseCredits, if (expanded) "Hide" else "Edit",
+                    ),
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
+            if (expanded) {
+                Text("Saved calculator settings · goal-based projection", style = MaterialTheme.typography.bodySmall)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    OutlinedTextField(
+                        value = baseGpaText,
+                        onValueChange = { baseGpaText = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Current GPA") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = baseCreditsText,
+                        onValueChange = { baseCreditsText = it.filter { c -> c.isDigit() }.take(4) },
+                        label = { Text("Credits taken") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                onCreditsChange?.let { CreditsStepper(credits = courseCredits, onChange = it) }
+                val editedGpa = baseGpaText.toDoubleOrNull()
+                val editedCredits = baseCreditsText.toIntOrNull()
+                Row {
+                    TextButton(
+                        enabled = editedGpa != null && editedGpa in 0.0..4.33 && editedCredits != null && editedCredits >= 0,
+                        onClick = {
+                            if (editedGpa != null && editedCredits != null) {
+                                scope.launch {
+                                    store.setCalculatorSettings(editedGpa, editedCredits)
+                                    expanded = false
+                                }
+                            }
+                        },
+                    ) { Text("Save settings") }
+                    TextButton(onClick = {
+                        scope.launch {
+                            store.resetCalculatorSettings()
+                            baseGpaText = gpa.gpa.toString()
+                            baseCreditsText = gpa.creditsTaken.toString()
+                        }
+                    }) { Text("Use portal values") }
+                }
                 Text(
-                    text = "Projected GPA",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "%.2f".format(projected),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
+                    text = "GPA must be 0–4.33; credits are previously taken credits. Projection adds this course as new credits.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
-            Text(
-                text = "%+.2f with %.2f pts × %d cr".format(delta, coursePoint, courseCredits),
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
-    }
-}
-
-@Composable
-private fun ResultRow(overall: Double, letter: String, point: Double) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(text = "Projected average", style = MaterialTheme.typography.labelLarge)
-            Text(
-                text = "%.1f".format(overall),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        GradeBadge(letter)
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = "%.2f".format(point),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.qarasky.unofficialkimep.data.BachelorProgress
 import dev.qarasky.unofficialkimep.data.KimepRepository
 import dev.qarasky.unofficialkimep.data.analytics.Analytics
 import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
@@ -117,11 +118,9 @@ fun GradesScreen(
 
 @Composable
 private fun GpaCard(gpa: GpaCredits) {
-    val progress = if (gpa.creditsTaken > 0) {
-        (gpa.creditsEarned.toFloat() / gpa.creditsTaken).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val progress = BachelorProgress.graduationProgress(gpa.creditsEarned)
+    val remaining = BachelorProgress.creditsRemaining(gpa.creditsEarned)
+    val standing = BachelorProgress.standingYear(gpa.creditsEarned)
 
     ElevatedCard(
         modifier = Modifier
@@ -147,30 +146,68 @@ private fun GpaCard(gpa: GpaCredits) {
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "Credits",
+                        text = "Earned credits",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "${gpa.creditsEarned}",
+                        text = "${gpa.creditsEarned} / ${BachelorProgress.GRADUATION_CREDITS}",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "of ${gpa.creditsTaken}",
+                        text = "${gpa.creditsTaken} credits taken",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Toward graduation",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        text = "Year $standing standing",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+                Text(
+                    text = if (remaining > 0) "$remaining credits to target" else "Credit target reached",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Standing is based on earned credits, not years enrolled.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
