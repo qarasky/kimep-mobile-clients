@@ -28,15 +28,15 @@ fun configValue(key: String, env: String): String =
         ?: ""
 
 android {
-    namespace = "kz.kimep.mobile"
+    namespace = "dev.qarasky.unofficialkimep"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "kz.kimep.mobile"
+        applicationId = "dev.qarasky.unofficialkimep"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2-beta"
+        versionCode = 3
+        versionName = "0.3-beta"
         vectorDrawables { useSupportLibrary = true }
 
         buildConfigField("String", "UMAMI_HOST", "\"${configValue("umami.host", "UMAMI_HOST")}\"")

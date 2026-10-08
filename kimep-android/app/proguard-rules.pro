@@ -1,10 +1,10 @@
 # Keep kotlinx.serialization generated serializers
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.**
--keepclassmembers class kz.kimep.mobile.data.model.** {
+-keepclassmembers class dev.qarasky.unofficialkimep.data.model.** {
     *** Companion;
 }
--keepclasseswithmembers class kz.kimep.mobile.data.model.** {
+-keepclasseswithmembers class dev.qarasky.unofficialkimep.data.model.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 

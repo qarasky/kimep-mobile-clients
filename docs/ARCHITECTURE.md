@@ -2,12 +2,12 @@
 
 Single-module Kotlin app (`kimep-android/app`), Jetpack Compose + Material 3, no DI
 framework (a small hand-rolled container) and no navigation library (state-driven
-screens). Package root: `kz.kimep.mobile`.
+screens). Package root: `dev.qarasky.unofficialkimep`.
 
 ## Package layout
 
 ```
-kz.kimep.mobile
+dev.qarasky.unofficialkimep
 ├── KimepApp           Application; creates notification channels, owns AppContainer
 ├── MainActivity       edge-to-edge host, requests POST_NOTIFICATIONS
 ├── di/AppContainer    wires api + stores + repositories (singletons)

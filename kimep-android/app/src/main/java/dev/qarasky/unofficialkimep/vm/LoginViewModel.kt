@@ -1,0 +1,52 @@
+package dev.qarasky.unofficialkimep.vm
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.qarasky.unofficialkimep.data.KimepRepository
+import dev.qarasky.unofficialkimep.data.analytics.Analytics
+import dev.qarasky.unofficialkimep.data.analytics.AnalyticsEvents
+import dev.qarasky.unofficialkimep.data.friendlyMessage
+import kotlinx.coroutines.launch
+
+data class LoginUiState(
+    val loading: Boolean = false,
+    val error: String? = null,
+)
+
+class LoginViewModel(
+    private val repository: KimepRepository,
+    private val analytics: Analytics,
+) : ViewModel() {
+
+    var uiState by mutableStateOf(LoginUiState())
+        private set
+
+    fun login(studentId: String, password: String) {
+        if (studentId.isBlank() || password.isBlank()) {
+            uiState = LoginUiState(error = "Enter your Student ID and password")
+            return
+        }
+        viewModelScope.launch {
+            uiState = LoginUiState(loading = true)
+            repository.login(studentId, password)
+                .onSuccess {
+                    analytics.track(AnalyticsEvents.LOGIN, mapOf("result" to "success"))
+                }
+                .onFailure {
+                    analytics.track(AnalyticsEvents.LOGIN, mapOf("result" to "failure"))
+                    uiState = LoginUiState(error = it.friendlyMessage())
+                }
+        }
+    }
+
+    companion object {
+        fun factory(repository: KimepRepository, analytics: Analytics) = viewModelFactory {
+            initializer { LoginViewModel(repository, analytics) }
+        }
+    }
+}

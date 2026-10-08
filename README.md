@@ -64,7 +64,7 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for how the app is put toge
 ```
 app-website/            download page (GitHub Pages: artchsh.github.io/kimep-mobile-clients)
 kimep-android/          Android app (Gradle project)
-  app/src/main/java/kz/kimep/mobile/
+  app/src/main/java/dev/qarasky/unofficialkimep/
     data/               models, API client, repositories, caches, notifications
     di/                 hand-rolled dependency container
     ui/                 Compose screens + theme
