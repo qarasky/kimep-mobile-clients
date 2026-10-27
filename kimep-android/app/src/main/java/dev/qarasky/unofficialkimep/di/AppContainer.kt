@@ -8,6 +8,7 @@ import dev.qarasky.unofficialkimep.data.ScheduleCache
 import dev.qarasky.unofficialkimep.data.SessionStore
 import dev.qarasky.unofficialkimep.data.SettingsStore
 import dev.qarasky.unofficialkimep.data.UpdateStore
+import dev.qarasky.unofficialkimep.data.export.CalendarExporter
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
 import dev.qarasky.unofficialkimep.data.notify.ReminderScheduler
 
@@ -21,6 +22,8 @@ class AppContainer(context: Context, private val api: KimepApi = KimepApi()) {
     val updateStore: UpdateStore = UpdateStore(appContext)
 
     val repository: KimepRepository = KimepRepository(api, sessionStore)
+
+    val calendarExporter: CalendarExporter = CalendarExporter(appContext, repository, scheduleCache)
 
     private val reminderScheduler: ReminderScheduler = ReminderScheduler(appContext)
     val reminderManager: ReminderManager =

@@ -1,7 +1,7 @@
 # Privacy
 
-This describes v1.0.1 and the current Android source. Its privacy notice is accessible from
-**Settings → Privacy → Privacy notice**, not shown as a first-run prompt.
+This describes v1.1.0 and the current Android source. Its privacy notice is accessible from
+**Settings → Privacy → Privacy notice** (a full page, not a dialog), not shown as a first-run prompt.
 
 ## No usage tracking
 
@@ -30,6 +30,22 @@ sent to an analytics service.
 
 Android system backups are enabled; stored app data may be included depending on your
 device's backup settings.
+
+## Calendar export
+
+Exporting the schedule is optional and starts only when you tap a button in
+**Settings → Calendar**.
+
+- **Add to a calendar** asks for Android's Calendar permission (`READ_CALENDAR` and
+  `WRITE_CALENDAR`). The app uses it to list your calendars and to add, and on a later
+  export replace, the class and exam events it created (identified by a marker set by the
+  app). It does not read or change your other events.
+- Once events are in a calendar such as Google Calendar, that calendar app and its provider
+  handle them under their own policies.
+- **Export for Proton Calendar** writes an `.ics` file to the app's temporary cache and
+  hands it only to the app you pick.
+- You can revoke the permission in Android Settings at any time. Events already added stay
+  in your calendar until you delete them there.
 
 ## GitHub update checks
 

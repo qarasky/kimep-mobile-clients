@@ -34,6 +34,7 @@ class DemoActivity : ComponentActivity() {
                         scheduleCache = container.scheduleCache,
                         settingsStore = container.settingsStore,
                         reminderManager = container.reminderManager,
+                        calendarExporter = container.calendarExporter,
                         onLogout = { finish() },
                     )
                 }

@@ -3,37 +3,29 @@ package dev.qarasky.unofficialkimep.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+/** Full-page privacy notice, shown under Settings with the app bar's back arrow. */
 @Composable
-fun PrivacyNoticeDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Filled.PrivacyTip, contentDescription = null) },
-        title = { Text("Privacy notice") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                PrivacyNoticeBody()
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
-        },
-    )
+fun PrivacyNoticeScreen(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+    ) {
+        PrivacyNoticeBody()
+    }
 }
 
 @Composable
@@ -63,6 +55,15 @@ private fun PrivacyNoticeBody() {
             ),
         )
         NoticeSection(
+            title = "Calendar export",
+            lines = listOf(
+                "Exporting your schedule is optional and only starts when you tap a button in Settings → Calendar.",
+                "Adding to a calendar asks for Android's Calendar permission. The app uses it to list your calendars and to add, and later replace, the class and exam events it created. It does not read or change your other events.",
+                "Once events are in a calendar such as Google Calendar, that calendar app and its provider handle them under their own policies.",
+                "The Proton Calendar option creates an .ics file in the app's temporary cache and hands it only to the app you pick.",
+            ),
+        )
+        NoticeSection(
             title = "Update checks",
             lines = listOf(
                 "The app automatically checks GitHub for new releases at most once a day. You can also check manually in Settings → App updates. These requests do not include your student ID, session or grades.",
@@ -73,6 +74,7 @@ private fun PrivacyNoticeBody() {
             title = "Your control",
             lines = listOf(
                 "Logging out clears your saved session and timetable and cancels reminders. Other local preferences remain.",
+                "You can revoke the Calendar permission in Android Settings at any time. Events already added stay in your calendar until you delete them there.",
                 "To remove all local app data, use Android Settings → Apps → this app → Storage → Clear storage.",
                 "This is an unofficial app and is not affiliated with KIMEP University.",
             ),

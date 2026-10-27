@@ -1,5 +1,6 @@
 package dev.qarasky.unofficialkimep.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -33,6 +34,7 @@ import dev.qarasky.unofficialkimep.data.KimepRepository
 import dev.qarasky.unofficialkimep.data.ScheduleCache
 import dev.qarasky.unofficialkimep.data.SessionState
 import dev.qarasky.unofficialkimep.data.SettingsStore
+import dev.qarasky.unofficialkimep.data.export.CalendarExporter
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
 
 private data class Destination(val label: String, val icon: ImageVector)
@@ -46,6 +48,7 @@ fun MainScreen(
     scheduleCache: ScheduleCache,
     settingsStore: SettingsStore,
     reminderManager: ReminderManager,
+    calendarExporter: CalendarExporter,
     onLogout: () -> Unit,
 ) {
     val destinations = listOf(
@@ -57,19 +60,28 @@ fun MainScreen(
 
     var index by rememberSaveable { mutableIntStateOf(0) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showPrivacy by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = showSettings) {
+        if (showPrivacy) showPrivacy = false else showSettings = false
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = if (showSettings) "Settings" else destinations[index].label,
+                        text = when {
+                            showPrivacy -> "Privacy notice"
+                            showSettings -> "Settings"
+                            else -> destinations[index].label
+                        },
                         style = MaterialTheme.typography.titleLarge,
                     )
                 },
                 navigationIcon = {
                     if (showSettings) {
-                        IconButton(onClick = { showSettings = false }) {
+                        IconButton(onClick = { if (showPrivacy) showPrivacy = false else showSettings = false }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
@@ -107,10 +119,15 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            if (showSettings) {
+            if (showSettings && showPrivacy) {
+                PrivacyNoticeScreen()
+            } else if (showSettings) {
                 SettingsScreen(
                     settingsStore = settingsStore,
                     reminderManager = reminderManager,
+                    calendarExporter = calendarExporter,
+                    sessionId = session.id,
+                    onOpenPrivacy = { showPrivacy = true },
                 )
             } else {
                 when (index) {

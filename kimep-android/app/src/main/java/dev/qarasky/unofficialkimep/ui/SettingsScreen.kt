@@ -45,6 +45,7 @@ import dev.qarasky.unofficialkimep.data.ReminderSettings
 import dev.qarasky.unofficialkimep.data.SettingsStore
 import dev.qarasky.unofficialkimep.BuildConfig
 import dev.qarasky.unofficialkimep.data.UpdateCheck
+import dev.qarasky.unofficialkimep.data.export.CalendarExporter
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
 import dev.qarasky.unofficialkimep.vm.SettingsViewModel
 import dev.qarasky.unofficialkimep.vm.ManualUpdateState
@@ -53,6 +54,9 @@ import dev.qarasky.unofficialkimep.vm.ManualUpdateState
 fun SettingsScreen(
     settingsStore: SettingsStore,
     reminderManager: ReminderManager,
+    calendarExporter: CalendarExporter,
+    sessionId: String,
+    onOpenPrivacy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: SettingsViewModel = viewModel(
@@ -63,8 +67,6 @@ fun SettingsScreen(
     )
     val settings by viewModel.settings
         .collectAsStateWithLifecycle(initialValue = ReminderSettings())
-
-    var showNotice by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -121,6 +123,15 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(24.dp))
         Text(
+            text = "Calendar",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        CalendarExportSection(exporter = calendarExporter, sessionId = sessionId)
+
+        Spacer(Modifier.height(24.dp))
+        Text(
             text = "Privacy",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -142,7 +153,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                TextButton(onClick = { showNotice = true }) {
+                TextButton(onClick = onOpenPrivacy) {
                     Text("Privacy notice")
                 }
             }
@@ -197,9 +208,6 @@ fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
     }
 
-    if (showNotice) {
-        PrivacyNoticeDialog(onDismiss = { showNotice = false })
-    }
     val result = (viewModel.updateState as? ManualUpdateState.Finished)?.result
     if (result is UpdateCheck.Result.Available) {
         UpdateDialog(update = result.update, onDismiss = viewModel::dismissUpdate)

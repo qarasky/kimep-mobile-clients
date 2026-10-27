@@ -60,6 +60,7 @@ fun KimepRoot() {
                 scheduleCache = container.scheduleCache,
                 settingsStore = container.settingsStore,
                 reminderManager = container.reminderManager,
+                calendarExporter = container.calendarExporter,
                 onLogout = {
                     scope.launch {
                         container.reminderManager.cancelAll()

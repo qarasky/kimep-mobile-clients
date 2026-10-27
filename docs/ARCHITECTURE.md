@@ -22,6 +22,7 @@ dev.qarasky.unofficialkimep
 │   ├── ScheduleCache          DataStore: last good timetable (JSON)
 │   ├── AcademicCalendar       maps semester codes -> midterm weeks
 │   ├── model/                 @Serializable DTOs
+│   ├── export/                timetable -> system calendar / .ics file
 │   └── notify/                reminder scheduling + notifications
 ├── ui/                Compose screens (see below)
 └── vm/                ViewModels, one per screen
@@ -93,6 +94,22 @@ Finals use a separate code base. Alarms are exact when
 
 `ReminderManager.refresh()` is called on app start (via the schedule load), after a
 schedule refresh, after a settings change, and after reboot.
+
+## Calendar export
+
+Settings → Calendar sends the full timetable (weekly classes + final exams) elsewhere.
+`ScheduleEvent.from` turns meetings/finals into neutral events (first matching weekday,
+duration, weekly repeat until `Date_To`, wall-clock times pinned to KIMEP's UTC+5), and
+two writers consume them:
+
+| Class | Role |
+|---|---|
+| `DeviceCalendarWriter` | lists writable calendars from `CalendarContract` and inserts recurring events (Google Calendar, DAVx5, any synced account). Needs `READ/WRITE_CALENDAR`. Events are tagged via `CUSTOM_APP_PACKAGE`/`CUSTOM_APP_URI` so a re-export replaces them |
+| `IcsBuilder` | RFC 5545 output (UTC times, `RRULE:FREQ=WEEKLY`), shared through a `FileProvider` URI |
+| `CalendarExporter` | facade: live timetable, falling back to `ScheduleCache` |
+
+Proton Calendar keeps its events outside Android's calendar provider, so it is reached via
+the `.ics` path (Proton's Android app imports `.ics` files opened with it).
 
 ## Date & time
 
