@@ -43,7 +43,7 @@ object IcsBuilder {
 
     internal fun escape(text: String): String = text
         .replace("\\", "\\\\")
-        .replace(";", "\;")
+        .replace(";", "\\;")
         .replace(",", "\\,")
         .replace("\r\n", "\\n")
         .replace("\n", "\\n")

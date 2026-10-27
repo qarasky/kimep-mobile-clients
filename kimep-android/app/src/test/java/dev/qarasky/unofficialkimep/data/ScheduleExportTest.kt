@@ -97,7 +97,7 @@ class ScheduleExportTest {
         assertTrue(ics, ics.contains("DTSTART:20260901T053000Z\r\n"))
         assertTrue(ics, ics.contains("DTEND:20260901T064500Z\r\n"))
         assertTrue(ics, ics.contains("RRULE:FREQ=WEEKLY;UNTIL=20261215T185959Z\r\n"))
-        assertTrue(ics, ics.contains("SUMMARY:Macroeconomics\\, Intro\; Part 1\r\n"))
+        assertTrue(ics, ics.contains("SUMMARY:Macroeconomics\\, Intro\\; Part 1\r\n"))
         assertTrue(ics, ics.contains("DESCRIPTION:Course: ECON101\\nSection: A\\nInstructor: Dr. Kim\r\n"))
         assertTrue(ics, ics.contains("UID:kimep-class-7@unofficialkimep\r\n"))
     }
