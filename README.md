@@ -18,7 +18,7 @@ download page on GitHub Pages, or grab it straight from
 ### Screenshots
 
 Captured on a real phone with a fictional student taking six catalog courses (18 credits).
-These screenshots show the v1.0.1 interface. The demo build is private and is not offered
+These screenshots show the v1.0.1 interface (they predate the calendar export). The demo build is private and is not offered
 as a download.
 
 <p align="center">
@@ -60,8 +60,14 @@ See [all updated screenshots and the demo setup](docs/screenshots/updated/README
   **Next**, and past events dimmed. Opens scrolled to the current event.
 - **Reminders** — notifications **1 hour** and **10 minutes** before each class, plus a
   final‑exam reminder. Each is individually togglable.
-- **Privacy** — no usage tracking in v1.0.1; the privacy notice is available
-  in Settings. See **[docs/PRIVACY.md](docs/PRIVACY.md)** for data handling and older builds.
+- **Calendar export** — Settings → Calendar copies your weekly classes and final exams
+  into a calendar. **Add to Google Calendar or other** writes directly into any calendar on
+  the device (Google, or any account synced through Android) after you grant Calendar
+  permission; running it again replaces what the app added. **Export for Proton Calendar
+  (.ics)** creates a file you import into Proton Calendar, which does not appear in
+  Android's calendar list. Both are one-off copies, not a live sync.
+- **Privacy** — no usage tracking since v1.0.1; the privacy notice is a full page in
+  Settings. See **[docs/PRIVACY.md](docs/PRIVACY.md)** for data handling and older builds.
 - **Material You** dynamic colour, light/dark theme, edge‑to‑edge.
 
 ## Tech stack
@@ -77,7 +83,7 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for how the app is put toge
 app-website/            download page (GitHub Pages: qarasky.github.io/kimep-mobile-clients)
 kimep-android/          Android app (Gradle project)
   app/src/main/java/dev/qarasky/unofficialkimep/
-    data/               models, API client, repositories, caches, notifications
+    data/               models, API client, repositories, caches, notifications, calendar export
     di/                 hand-rolled dependency container
     ui/                 Compose screens + theme
     vm/                 view models
@@ -174,10 +180,12 @@ python3 tools/parse_calendar.py     # needs poppler (pdftotext)
 
 ## Privacy
 
-v1.0.1 contains no usage analytics, tracking client or first-run privacy
+v1.0.1 and later contain no usage analytics, tracking client or first-run privacy
 prompt. **Settings → Privacy → Privacy notice** explains connections to KIMEP and GitHub,
-on-device storage, and how to clear your data. Account requests use KIMEP's HTTPS API;
-passwords are not saved by the app.
+on-device storage, calendar export, and how to clear your data. Account requests use KIMEP's
+HTTPS API; passwords are not saved by the app. Calendar permission is requested only if you
+use the optional calendar export, and is used only to list your calendars and manage the
+events the app added.
 
 **Released v1.0.0 and earlier builds may still send anonymous usage statistics.** Those
 builds retain their Settings → Privacy opt-out. Removing tracking from the source does
