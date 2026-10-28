@@ -12,6 +12,8 @@ object IcsBuilder {
 
     private val stamp: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
+    private val dateOnly: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneOffset.UTC)
 
     fun build(events: List<ScheduleEvent>, now: Instant = Instant.now()): String {
         val lines = mutableListOf(
@@ -27,10 +29,18 @@ object IcsBuilder {
             lines += "BEGIN:VEVENT"
             lines += "UID:${event.uid}"
             lines += "DTSTAMP:${stamp.format(now)}"
-            lines += "DTSTART:${stamp.format(start)}"
-            lines += "DTEND:${stamp.format(end)}"
+            if (event.allDay) {
+                lines += "DTSTART;VALUE=DATE:${dateOnly.format(start)}"
+                lines += "DTEND;VALUE=DATE:${dateOnly.format(end)}"
+            } else {
+                lines += "DTSTART:${stamp.format(start)}"
+                lines += "DTEND:${stamp.format(end)}"
+            }
             event.repeatUntilMillis?.let {
                 lines += "RRULE:FREQ=WEEKLY;UNTIL=${stamp.format(Instant.ofEpochMilli(it))}"
+            }
+            if (event.excludedStartMillis.isNotEmpty()) {
+                lines += "EXDATE:" + event.excludedStartMillis.joinToString(",") { stamp.format(Instant.ofEpochMilli(it)) }
             }
             lines += "SUMMARY:${escape(event.title)}"
             event.location?.let { lines += "LOCATION:${escape(it)}" }

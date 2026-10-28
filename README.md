@@ -43,7 +43,9 @@ See [all updated screenshots and the demo setup](docs/screenshots/updated/README
 - **Login** with Student ID and password; the session is stored on device and refreshed
   automatically.
 - **Schedule** — weekly timetable grouped by weekday, with the **current day highlighted**,
-  a **midterm‑week banner** derived from the academic calendar, and pull‑to‑refresh.
+  **midterm and holiday banners** derived from the academic calendar (official midterm week
+  plus the week before, when professors often start), "No classes" on holidays and Study
+  Break, and pull‑to‑refresh.
   Cached locally so it renders instantly on launch and updates in the background
   (stale‑while‑revalidate).
 - **Finals** — a Classes/Finals switch for the exam timetable (populated once the
@@ -57,7 +59,10 @@ See [all updated screenshots and the demo setup](docs/screenshots/updated/README
   daily check.
 - **Academic calendar** — the official PDF parsed into structured data: browse both
   academic years and all semesters, with the ongoing event marked **Now**, the next one
-  **Next**, and past events dimmed. Opens scrolled to the current event.
+  **Next**, and past events dimmed. Opens scrolled to the current event. The app picks up
+  the new year's PDF from kimep.kz by itself (checked from June) and reads it on the phone.
+- **Midterm dates** — mark the date of a course's midterm from its details; it shows in
+  the Schedule's Midterms tab and banners, and in calendar exports.
 - **Reminders** — notifications **1 hour** and **10 minutes** before each class, plus a
   final‑exam reminder. Each is individually togglable.
 - **Calendar export** — Settings → Calendar copies your weekly classes and final exams
@@ -177,6 +182,11 @@ academic year:
 ```bash
 python3 tools/parse_calendar.py     # needs poppler (pdftotext)
 ```
+
+The app does not depend on this: from June it downloads the new year's English PDF itself and
+parses it on the phone (same algorithm, `data/calendar/CalendarPdfParser.kt`). Years KIMEP
+publishes only as a scanned image are typed in under `tools/calendar_manual/` and flagged in the
+app for double-checking.
 
 ## Privacy
 

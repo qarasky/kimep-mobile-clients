@@ -42,6 +42,12 @@ fun KimepRoot() {
         }
     }
 
+    // New academic-year calendar: once a day, and only while one is actually needed.
+    LaunchedEffect(Unit) {
+        val report = runCatching { container.calendarImporter.autoCheck() }.getOrNull()
+        if (report?.changedAnything == true) runCatching { container.reminderManager.refresh() }
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -61,10 +67,13 @@ fun KimepRoot() {
                 settingsStore = container.settingsStore,
                 reminderManager = container.reminderManager,
                 calendarExporter = container.calendarExporter,
+                midtermStore = container.midtermStore,
+                calendarImporter = container.calendarImporter,
                 onLogout = {
                     scope.launch {
                         container.reminderManager.cancelAll()
                         container.scheduleCache.clear()
+                        container.midtermStore.clear()
                         container.repository.logout()
                     }
                 },

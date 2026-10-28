@@ -4,6 +4,7 @@ import dev.qarasky.unofficialkimep.data.export.IcsBuilder
 import dev.qarasky.unofficialkimep.data.export.ScheduleEvent
 import dev.qarasky.unofficialkimep.data.model.ClassMeeting
 import dev.qarasky.unofficialkimep.data.model.FinalExam
+import dev.qarasky.unofficialkimep.data.model.MidtermMark
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -110,5 +111,35 @@ class ScheduleExportTest {
             assertTrue("line $i has $octets octets", octets <= 75)
         }
         assertEquals("SUMMARY:" + "é".repeat(100), folded.replace("\r\n ", ""))
+    }
+
+    @Test
+    fun classesOnDaysOffAreExcludedFromTheRepeat() {
+        // Class on Tuesdays 1 Sep - 15 Dec; two of those Tuesdays are days off.
+        val daysOff = setOf(LocalDate.of(2026, 10, 13), LocalDate.of(2026, 10, 20), LocalDate.of(2026, 10, 14)) // the Wednesday never matches
+        val event = ScheduleEvent.from(listOf(meeting()), emptyList(), daysOff).single()
+        assertEquals(2, event.excludedStartMillis.size)
+        val ics = IcsBuilder.build(listOf(event), now = Instant.parse("2026-08-20T00:00:00Z"))
+        // 10:30 at UTC+5 is 05:30Z.
+        assertTrue(ics, ics.contains("EXDATE:20261013T053000Z,20261020T053000Z\r\n"))
+    }
+
+    @Test
+    fun aClassWhoseOnlyDateIsADayOffIsDropped() {
+        val day = LocalDate.of(2026, 9, 1)
+        val events = ScheduleEvent.from(listOf(meeting(from = day, to = day)), emptyList(), setOf(day))
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun markedMidtermsBecomeAllDayEvents() {
+        val mark = MidtermMark("MATH201", "Calculus", "F2026", "2026-10-14")
+        val event = ScheduleEvent.from(emptyList(), emptyList(), emptySet(), listOf(mark)).single()
+        assertTrue(event.allDay)
+        assertEquals("Midterm: Calculus", event.title)
+        val ics = IcsBuilder.build(listOf(event), now = Instant.parse("2026-08-20T00:00:00Z"))
+        assertTrue(ics, ics.contains("DTSTART;VALUE=DATE:20261014\r\n"))
+        assertTrue(ics, ics.contains("DTEND;VALUE=DATE:20261015\r\n"))
+        assertTrue(ics, ics.contains("SUMMARY:Midterm: Calculus\r\n"))
     }
 }

@@ -20,7 +20,9 @@ dev.qarasky.unofficialkimep
 │   ├── SessionStore           DataStore: session GUID + profile
 │   ├── SettingsStore          DataStore: reminder toggles + scheduled ids
 │   ├── ScheduleCache          DataStore: last good timetable (JSON)
-│   ├── AcademicCalendar       maps semester codes -> midterm weeks
+│   ├── AcademicCalendar       progress deadlines -> early + official midterm windows
+│   ├── MidtermStore           DataStore: midterm dates the user marked per course
+│   ├── calendar/              on-device calendar import + holidays (see below)
 │   ├── model/                 @Serializable DTOs
 │   ├── export/                timetable -> system calendar / .ics file
 │   └── notify/                reminder scheduling + notifications
@@ -111,6 +113,34 @@ two writers consume them:
 Proton Calendar keeps its events outside Android's calendar provider, so it is reached via
 the `.ics` path (Proton's Android app imports `.ics` files opened with it).
 
+## Academic calendar
+
+`assets/calendar.json` (built by `tools/parse_calendar.py`) is the baseline. The app can
+add newer years at runtime; `CalendarRepository` merges both and the imported copy wins.
+
+| Class (`data/calendar`) | Role |
+|---|---|
+| `CalendarSource` | finds the English PDF links on KIMEP's calendar page (kimep.kz hosts only) |
+| `PdfTextExtractor` | pdfbox-android text extraction with glyph positions (page 1) |
+| `CalendarPdfParser` | Kotlin port of the Python parser: words -> rows -> Fall/Spring/Summer columns |
+| `CalendarValidator` | rejects implausible results, so a bad parse never replaces good data |
+| `CalendarImporter` | runs the above. `autoCheck` is rate-limited (daily, only when a needed year is missing); `checkNow` is the Settings button. Scanned PDFs are remembered as unreadable |
+| `ImportedCalendars` | file-backed store for imported years |
+| `DaysOff` | holidays ("KIMEP is closed"), dates named in notes, make-up wording and Study Break weeks, as day-off ranges |
+| `ScheduleNotices` | banners for the Schedule tab (midterm weeks, upcoming days off, marked midterms) |
+
+Midterms: the progress-grade deadline `D` ends the "Progress Submission" event. The
+official midterm week is the Mon–Sun week before Monday(`D`); professors often start a
+week earlier, so that week is shown as "midterms may start". Both come from
+`AcademicCalendar.midtermWindows`. Days off remove classes from the schedule view,
+reminders and exports (single `EXDATE`s on recurring events). Users can also mark a
+specific midterm date per course (`MidtermStore`); it appears in the Schedule's Midterms
+tab, the notice banners and exports as an all-day event.
+
+Years whose PDF is only a scanned image cannot be read on the phone. Those are typed in
+by hand (`tools/calendar_manual/`), flagged `"source": "manual"` and shown with a
+"double-check" warning until a readable PDF replaces them.
+
 ## Date & time
 
 All API dates are ASP.NET JSON dates: `"\/Date(<epoch millis>)\/"`. Two encodings exist
@@ -168,4 +198,5 @@ update `tools/parse_calendar.py` that generates `assets/calendar.json`.
   `FinalExam` DTO is intentionally permissive. Align it once the endpoint returns data.
 - Release builds keep `isMinifyEnabled = false` (R8 rules for kotlinx.serialization/Ktor are
   not tuned yet).
-- The academic calendar asset is regenerated manually each academic year.
+- The bundled academic calendar is only a fallback: new years are imported on the phone,
+  but scanned PDFs still need `tools/calendar_manual/` entries.

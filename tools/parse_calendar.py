@@ -34,12 +34,21 @@ MONTHS = {
     "december": 12,
 }
 
+# The calendar page (https://www.kimep.kz/current-students/kz/calendar/) links the KAZ
+# PDFs; the ENG ones live next to them. The upload folder changes when a file is
+# replaced, so check the page if a download 404s.
 SOURCES = {
+    "AY27-28-detailed-ENG.pdf":
+        "https://www.kimep.kz/current-students/files/2026/10/AY27-28-detailed-ENG.pdf",
     "AY26-27-detailed-ENG.pdf":
-        "https://www.kimep.kz/current-students/files/2026/08/AY26-27-detailed-ENG.pdf",
+        "https://www.kimep.kz/current-students/files/2026/10/AY26-27-detailed-ENG.pdf",
     "AY25-26-detailed-ENG.pdf":
         "https://www.kimep.kz/current-students/files/2025/04/AY25-26-detailed-ENG.pdf",
 }
+
+# Years KIMEP published only as a scanned image (no text layer). They are transcribed
+# by hand into tools/calendar_manual/<year id>.json and merged in when the PDF can't be read.
+MANUAL_DIR = os.path.join(HERE, "calendar_manual")
 
 HEADER_TOKENS = ["Fall", "Spring", "Summer1", "Summer2"]
 WORD_RE = re.compile(
@@ -187,6 +196,11 @@ def build_year(pdf_path, year_id):
         if closed_y is not None and y > closed_y + 1:
             holiday_mode = True
 
+        if closed_y is not None and abs(y - closed_y) < 1:
+            # the "KIMEP is closed" heading is not part of the first holiday's label
+            label_lines = []
+            continue
+
         label_words = [w for w in row if w[0] < label_max]
         col_words = [w for w in row if w[0] >= label_max]
 
@@ -260,28 +274,71 @@ def ensure_pdf(name):
         return path
     os.makedirs(CAL_DIR, exist_ok=True)
     print(f"downloading {name} …", file=sys.stderr)
-    subprocess.run(["curl", "-sSL", "-o", path, SOURCES[name]], check=True)
+    subprocess.run(["curl", "-sSL", "-f", "-o", path, SOURCES[name]], check=True)
     return path
 
 
+def year_id_for(pdf_name):
+    """AY26-27-detailed-ENG.pdf -> 2026-2027"""
+    m = re.match(r"AY(\d\d)-(\d\d)-", pdf_name)
+    return f"20{m.group(1)}-20{m.group(2)}"
+
+
+def has_text_layer(pdf_path):
+    return bool(words_from_pdf(pdf_path))
+
+
+def dump_words(pdf_path):
+    """TSV of the words used for parsing (x0, y, x1, text): fixtures for the Kotlin parser tests."""
+    for x0, y, x1, text in words_from_pdf(pdf_path):
+        print(f"{x0:.2f}\t{y:.2f}\t{x1:.2f}\t{text}")
+
+
+def load_manual():
+    years = {}
+    if os.path.isdir(MANUAL_DIR):
+        for name in sorted(os.listdir(MANUAL_DIR)):
+            if name.endswith(".json"):
+                with open(os.path.join(MANUAL_DIR, name)) as f:
+                    year = json.load(f)
+                years[year["id"]] = year
+    return years
+
+
 def main():
-    pdfs = [
-        ("2026-2027", ensure_pdf("AY26-27-detailed-ENG.pdf")),
-        ("2025-2026", ensure_pdf("AY25-26-detailed-ENG.pdf")),
-    ]
-    years = []
-    for year_id, pdf in pdfs:
-        if not os.path.exists(pdf):
-            print(f"skip missing {pdf}", file=sys.stderr)
+    if len(sys.argv) == 3 and sys.argv[1] == "--dump-words":
+        dump_words(sys.argv[2])
+        return
+
+    manual = load_manual()
+    years = {}
+    for name in SOURCES:
+        year_id = year_id_for(name)
+        try:
+            pdf = ensure_pdf(name)
+        except subprocess.CalledProcessError:
+            print(f"{year_id}: download failed", file=sys.stderr)
+            continue
+        if not has_text_layer(pdf):
+            print(f"{year_id}: scanned PDF without a text layer", file=sys.stderr)
             continue
         year = build_year(pdf, year_id)
+        year["source"] = "pdf"
         total = sum(len(s["events"]) for s in year["semesters"])
         print(f"{year_id}: {total} events, {len(year['closed'])} closures")
-        years.append(year)
+        years[year_id] = year
 
+    for year_id, year in manual.items():
+        if year_id in years:
+            print(f"{year_id}: readable PDF available, ignoring the manual transcription")
+            continue
+        print(f"{year_id}: using the manual transcription")
+        years[year_id] = year
+
+    ordered = [years[k] for k in sorted(years, reverse=True)]
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
-        json.dump({"years": years}, f, ensure_ascii=False, indent=2)
+        json.dump({"years": ordered}, f, ensure_ascii=False, indent=2)
     print(f"wrote {OUT}")
 
 

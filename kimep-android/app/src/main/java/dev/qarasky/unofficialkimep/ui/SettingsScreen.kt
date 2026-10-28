@@ -45,6 +45,8 @@ import dev.qarasky.unofficialkimep.data.ReminderSettings
 import dev.qarasky.unofficialkimep.data.SettingsStore
 import dev.qarasky.unofficialkimep.BuildConfig
 import dev.qarasky.unofficialkimep.data.UpdateCheck
+import dev.qarasky.unofficialkimep.data.CalendarRepository
+import dev.qarasky.unofficialkimep.data.calendar.CalendarImporter
 import dev.qarasky.unofficialkimep.data.export.CalendarExporter
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
 import dev.qarasky.unofficialkimep.vm.SettingsViewModel
@@ -55,6 +57,8 @@ fun SettingsScreen(
     settingsStore: SettingsStore,
     reminderManager: ReminderManager,
     calendarExporter: CalendarExporter,
+    calendarImporter: CalendarImporter,
+    calendarRepository: CalendarRepository,
     sessionId: String,
     onOpenPrivacy: () -> Unit,
     modifier: Modifier = Modifier,
@@ -129,6 +133,19 @@ fun SettingsScreen(
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
         CalendarExportSection(exporter = calendarExporter, sessionId = sessionId)
+
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = "Academic calendar",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        AcademicCalendarSection(
+            importer = calendarImporter,
+            repository = calendarRepository,
+            reminderManager = reminderManager,
+        )
 
         Spacer(Modifier.height(24.dp))
         Text(

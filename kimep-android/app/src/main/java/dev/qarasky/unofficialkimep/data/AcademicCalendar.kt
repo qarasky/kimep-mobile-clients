@@ -5,11 +5,25 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 
-/** A week that counts as "midterms" for a semester, derived from the academic calendar. */
+enum class MidtermPhase {
+    /** The week before the official one: many professors already hold midterms then. */
+    Early,
+
+    /** The official midterm week: the Monday-to-Sunday week before progress grades are due. */
+    Official,
+}
+
+/**
+ * A week that counts as "midterms" for a semester, derived from the academic calendar.
+ * [round] is 1 for the first progress submission and 2 for the second; [deadline] is the
+ * day progress grades are due.
+ */
 data class MidtermWindow(
-    val label: String,
+    val round: Int,
+    val phase: MidtermPhase,
     val start: LocalDate,
     val end: LocalDate,
+    val deadline: LocalDate,
 ) {
     fun contains(date: LocalDate): Boolean = !date.isBefore(start) && !date.isAfter(end)
 }
@@ -46,8 +60,12 @@ object AcademicCalendar {
     }
 
     /**
-     * Weeks (Mon–Sun) that contain a "Progress Submission" deadline for the given
-     * semester. Falls back to an empty list when the calendar has no matching data.
+     * Midterm weeks for the given semester, earliest first.
+     *
+     * KIMEP's calendar lists the progress-submission deadline (a Monday, or a period ending
+     * on one). The week before it is the official midterm week, but professors often start a
+     * week earlier, so that week is returned as an [MidtermPhase.Early] window. Falls back to
+     * an empty list when the calendar has no matching data.
      */
     fun midtermWindows(data: CalendarData, semesterCode: String): List<MidtermWindow> {
         val yearId = yearIdForSemester(semesterCode) ?: return emptyList()
@@ -57,22 +75,24 @@ object AcademicCalendar {
 
         return semester.events
             .filter { it.title.contains("Progress Submission", ignoreCase = true) }
-            .mapNotNull { event ->
-                val date = event.start
+            .mapIndexedNotNull { index, event ->
+                // For a submission *period* the deadline is its last day.
+                val deadline = (event.end ?: event.start)
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: return@mapNotNull null
-                val monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                MidtermWindow(
-                    label = shortLabel(event.title),
-                    start = monday,
-                    end = monday.plusDays(6),
+                    ?: return@mapIndexedNotNull null
+                val round = when {
+                    event.title.contains("First", ignoreCase = true) -> 1
+                    event.title.contains("Second", ignoreCase = true) -> 2
+                    else -> index + 1
+                }
+                val deadlineWeek = deadline.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                val official = deadlineWeek.minusWeeks(1)
+                listOf(
+                    MidtermWindow(round, MidtermPhase.Early, official.minusWeeks(1), official.minusDays(1), deadline),
+                    MidtermWindow(round, MidtermPhase.Official, official, official.plusDays(6), deadline),
                 )
             }
-    }
-
-    private fun shortLabel(title: String): String = when {
-        title.contains("First", ignoreCase = true) -> "First progress submissions are due"
-        title.contains("Second", ignoreCase = true) -> "Second progress submissions are due"
-        else -> title
+            .flatten()
+            .sortedBy { it.start }
     }
 }

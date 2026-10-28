@@ -34,10 +34,11 @@ class ReminderScheduler(private val context: Context) {
         previousIds: Set<Int>,
         hourBefore: Boolean,
         tenMinutesBefore: Boolean,
+        daysOff: Set<LocalDate> = emptySet(),
     ) {
         cancel(previousIds)
         if (!hourBefore && !tenMinutesBefore) return
-        meetings.forEach { scheduleMeeting(it, hourBefore, tenMinutesBefore) }
+        meetings.forEach { scheduleMeeting(it, hourBefore, tenMinutesBefore, daysOff) }
     }
 
     fun rescheduleFinals(exams: List<FinalExam>, previousIds: Set<Int>, enabled: Boolean) {
@@ -68,7 +69,12 @@ class ReminderScheduler(private val context: Context) {
         }
     }
 
-    private fun scheduleMeeting(meeting: ClassMeeting, hourBefore: Boolean, tenMinutesBefore: Boolean) {
+    private fun scheduleMeeting(
+        meeting: ClassMeeting,
+        hourBefore: Boolean,
+        tenMinutesBefore: Boolean,
+        daysOff: Set<LocalDate>,
+    ) {
         val from = ApiDate.localDate(meeting.dateFrom) ?: return
         val to = ApiDate.localDate(meeting.dateTo) ?: return
         val time = ApiDate.localTime(meeting.timeFrom) ?: return
@@ -82,16 +88,20 @@ class ReminderScheduler(private val context: Context) {
 
         var week = 0
         while (!date.isAfter(to) && week < MAX_WEEKS) {
-            val startAt = LocalDateTime.of(date, time)
-                .atZone(ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
+            // The week index stays in step even when a day off is skipped, so request codes
+            // remain deterministic.
+            if (date !in daysOff) {
+                val startAt = LocalDateTime.of(date, time)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
 
-            if (hourBefore) {
-                scheduleClassAlarm(meeting, week, LEAD_HOUR, startAt - HOUR_MS, "Class in 1 hour")
-            }
-            if (tenMinutesBefore) {
-                scheduleClassAlarm(meeting, week, LEAD_TEN, startAt - TEN_MIN_MS, "Class in 10 minutes")
+                if (hourBefore) {
+                    scheduleClassAlarm(meeting, week, LEAD_HOUR, startAt - HOUR_MS, "Class in 1 hour")
+                }
+                if (tenMinutesBefore) {
+                    scheduleClassAlarm(meeting, week, LEAD_TEN, startAt - TEN_MIN_MS, "Class in 10 minutes")
+                }
             }
 
             date = date.plusWeeks(1)

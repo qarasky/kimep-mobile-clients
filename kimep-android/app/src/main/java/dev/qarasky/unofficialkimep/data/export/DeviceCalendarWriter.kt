@@ -84,7 +84,9 @@ class DeviceCalendarWriter(private val context: Context) {
         put(Events.EVENT_LOCATION, event.location)
         put(Events.DESCRIPTION, event.description)
         put(Events.DTSTART, event.startMillis)
-        put(Events.EVENT_TIMEZONE, ScheduleEvent.TIME_ZONE_ID)
+        // All-day events are anchored to UTC midnight; everything else to KIMEP time.
+        put(Events.EVENT_TIMEZONE, if (event.allDay) "UTC" else ScheduleEvent.TIME_ZONE_ID)
+        if (event.allDay) put(Events.ALL_DAY, 1)
         put(Events.CUSTOM_APP_PACKAGE, context.packageName)
         put(Events.CUSTOM_APP_URI, APP_URI)
         val until = event.repeatUntilMillis
@@ -92,6 +94,9 @@ class DeviceCalendarWriter(private val context: Context) {
             // The provider wants DURATION (not DTEND) on recurring events.
             put(Events.DURATION, "PT${event.durationMinutes}M")
             put(Events.RRULE, "FREQ=WEEKLY;UNTIL=${UNTIL_FORMAT.format(Instant.ofEpochMilli(until))}")
+            if (event.excludedStartMillis.isNotEmpty()) {
+                put(Events.EXDATE, event.excludedStartMillis.joinToString(",") { UNTIL_FORMAT.format(Instant.ofEpochMilli(it)) })
+            }
         } else {
             put(Events.DTEND, event.startMillis + event.durationMinutes * 60_000L)
         }

@@ -106,6 +106,9 @@ dependencies {
     implementation(libs.ktor.serialization.json)
     implementation(libs.kotlinx.serialization.json)
 
+    // Reads KIMEP's calendar PDFs on the device (see data/calendar/PdfTextExtractor.kt).
+    implementation(libs.pdfbox.android)
+
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 

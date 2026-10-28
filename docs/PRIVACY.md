@@ -47,6 +47,19 @@ Exporting the schedule is optional and starts only when you tap a button in
 - You can revoke the permission in Android Settings at any time. Events already added stay
   in your calendar until you delete them there.
 
+## Academic calendar
+
+The app bundles KIMEP's academic calendar. From June it also looks for the new year's
+calendar on kimep.kz, at most once a day and only while the current or next academic year
+is missing. **Settings → Academic calendar → Check for new calendar** does the same on
+demand. The calendar page and PDF are plain downloads from kimep.kz; the requests do not
+include your student ID, session or grades. The PDF is read on the phone and the result
+is kept in the app's private storage. KIMEP can see normal connection information, such
+as your IP address.
+
+Midterm dates you mark for a course are stored only on the device. They are never sent
+anywhere, are added to a calendar export only if you export, and are cleared on logout.
+
 ## GitHub update checks
 
 The app automatically checks public GitHub releases at most once per day and offers a link
@@ -58,7 +71,7 @@ information, such as your IP address, when you connect to their services.
 
 ## Your control
 
-Logging out clears the saved session and timetable and cancels local reminders. Other
+Logging out clears the saved session, timetable and marked midterm dates and cancels local reminders. Other
 preferences remain. To remove all on-device app data, use Android Settings → Apps → this
 app → Storage → Clear storage.
 

@@ -3,10 +3,12 @@ package dev.qarasky.unofficialkimep.data.export
 import dev.qarasky.unofficialkimep.data.ApiDate
 import dev.qarasky.unofficialkimep.data.model.ClassMeeting
 import dev.qarasky.unofficialkimep.data.model.FinalExam
+import dev.qarasky.unofficialkimep.data.model.MidtermMark
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneOffset
 import java.time.temporal.TemporalAdjusters
 
 /**
@@ -14,7 +16,10 @@ import java.time.temporal.TemporalAdjusters
  * (system calendar provider or an .ics file).
  *
  * [repeatUntilMillis] is null for one-off events (final exams). Otherwise the event
- * repeats weekly, starting at [startMillis], through that instant (inclusive).
+ * repeats weekly, starting at [startMillis], through that instant (inclusive), except for
+ * the occurrences starting at [excludedStartMillis] (holidays, Study Break).
+ *
+ * An [allDay] event starts at UTC midnight of its date and lasts one day.
  */
 data class ScheduleEvent(
     val uid: String,
@@ -24,6 +29,8 @@ data class ScheduleEvent(
     val startMillis: Long,
     val durationMinutes: Int,
     val repeatUntilMillis: Long? = null,
+    val excludedStartMillis: List<Long> = emptyList(),
+    val allDay: Boolean = false,
 ) {
     companion object {
         /** Wall-clock times from the API are KIMEP local time. */
@@ -33,10 +40,35 @@ data class ScheduleEvent(
         private const val DEFAULT_EXAM_MINUTES = 120
         private val DEFAULT_EXAM_START: LocalTime = LocalTime.of(9, 0)
 
-        fun from(meetings: List<ClassMeeting>, finals: List<FinalExam>): List<ScheduleEvent> =
-            meetings.mapNotNull(::fromMeeting) + finals.mapNotNull(::fromFinal)
+        /**
+         * @param daysOff dates with no classes; class occurrences on them are left out.
+         * @param marks midterm dates the student marked, exported as all-day events.
+         */
+        fun from(
+            meetings: List<ClassMeeting>,
+            finals: List<FinalExam>,
+            daysOff: Set<LocalDate> = emptySet(),
+            marks: List<MidtermMark> = emptyList(),
+        ): List<ScheduleEvent> =
+            meetings.mapNotNull { fromMeeting(it, daysOff) } +
+                finals.mapNotNull(::fromFinal) +
+                marks.mapNotNull(::fromMark)
 
-        private fun fromMeeting(meeting: ClassMeeting): ScheduleEvent? {
+        private fun fromMark(mark: MidtermMark): ScheduleEvent? {
+            val date = mark.localDate ?: return null
+            val key = mark.courseKey.filter { it.isLetterOrDigit() }.ifEmpty { "course" }
+            return ScheduleEvent(
+                uid = "kimep-midterm-$key-$date@unofficialkimep",
+                title = "Midterm: ${mark.courseTitle}",
+                location = null,
+                description = "Marked in the KIMEP app",
+                startMillis = date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+                durationMinutes = 24 * 60,
+                allDay = true,
+            )
+        }
+
+        private fun fromMeeting(meeting: ClassMeeting, daysOff: Set<LocalDate>): ScheduleEvent? {
             val from = ApiDate.localDate(meeting.dateFrom) ?: return null
             val to = ApiDate.localDate(meeting.dateTo) ?: return null
             val start = ApiDate.localTime(meeting.timeFrom) ?: return null
@@ -45,6 +77,13 @@ data class ScheduleEvent(
 
             val first: LocalDate = from.with(TemporalAdjusters.nextOrSame(day))
             if (first.isAfter(to)) return null
+
+            val excluded = generateSequence(first) { it.plusWeeks(1) }
+                .takeWhile { !it.isAfter(to) }
+                .filter { it in daysOff }
+                .map { millis(it, start) }
+                .toList()
+            if (to.isBefore(first.plusWeeks(1)) && excluded.isNotEmpty()) return null // its only class is a day off
 
             val minutes = minutesBetween(start, ApiDate.localTime(meeting.timeTo), DEFAULT_CLASS_MINUTES)
             val startMillis = millis(first, start)
@@ -62,7 +101,8 @@ data class ScheduleEvent(
                 ),
                 startMillis = startMillis,
                 durationMinutes = minutes,
-                repeatUntilMillis = if (to.isAfter(first)) untilMillis else null,
+                repeatUntilMillis = if (!to.isBefore(first.plusWeeks(1))) untilMillis else null,
+                excludedStartMillis = excluded,
             )
         }
 

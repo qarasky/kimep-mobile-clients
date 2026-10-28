@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.qarasky.unofficialkimep.data.CalendarRepository
+import dev.qarasky.unofficialkimep.data.calendar.CalendarImporter
 import dev.qarasky.unofficialkimep.data.model.CalendarClosure
 import dev.qarasky.unofficialkimep.data.model.CalendarEvent
 import dev.qarasky.unofficialkimep.ui.components.LoadingState
@@ -55,7 +57,7 @@ fun CalendarScreen(
 ) {
     val viewModel: CalendarViewModel = viewModel(factory = CalendarViewModel.factory(repository))
     val state = viewModel.uiState
-    var yearIndex by rememberSaveable { mutableIntStateOf(0) }
+    var chosenYearId by rememberSaveable { mutableStateOf<String?>(null) }
     var tabIndex by rememberSaveable { mutableIntStateOf(0) }
 
     when {
@@ -77,7 +79,11 @@ fun CalendarScreen(
         )
 
         else -> {
-            val year = state.data.years.getOrElse(yearIndex) { state.data.years.first() }
+            // Open on the academic year we're in now; the newest one may be next year's.
+            val currentId = remember { CalendarImporter.yearIdContaining(LocalDate.now()) }
+            val year = state.data.years.firstOrNull { it.id == chosenYearId }
+                ?: state.data.years.firstOrNull { it.id == currentId }
+                ?: state.data.years.first()
             val tabTitles = remember(year) { year.semesters.map { it.name } + "Closed" }
 
             Column(modifier.fillMaxSize()) {
@@ -88,17 +94,27 @@ fun CalendarScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        state.data.years.forEachIndexed { index, y ->
+                        state.data.years.forEach { y ->
                             FilterChip(
-                                selected = index == yearIndex,
+                                selected = y.id == year.id,
                                 onClick = {
-                                    yearIndex = index
+                                    chosenYearId = y.id
                                     tabIndex = 0
                                 },
                                 label = { Text(y.id) },
                             )
                         }
                     }
+                }
+
+                if (year.isManual) {
+                    Text(
+                        text = "KIMEP published this year's calendar only as a scanned image, so these " +
+                            "dates were typed in by hand. Please double-check them against KIMEP's PDF.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
                 }
 
                 PrimaryScrollableTabRow(

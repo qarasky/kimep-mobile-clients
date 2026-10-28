@@ -22,7 +22,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
@@ -31,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -38,12 +41,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -53,15 +58,27 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.qarasky.unofficialkimep.data.ApiDate
 import dev.qarasky.unofficialkimep.data.CalendarRepository
 import dev.qarasky.unofficialkimep.data.KimepRepository
+import dev.qarasky.unofficialkimep.data.MidtermPhase
+import dev.qarasky.unofficialkimep.data.MidtermStore
+import dev.qarasky.unofficialkimep.data.MidtermWindow
 import dev.qarasky.unofficialkimep.data.ScheduleCache
+import dev.qarasky.unofficialkimep.data.calendar.DayOff
+import dev.qarasky.unofficialkimep.data.calendar.MakeUp
+import dev.qarasky.unofficialkimep.data.calendar.NoticeKind
+import dev.qarasky.unofficialkimep.data.calendar.ScheduleNotice
 import dev.qarasky.unofficialkimep.data.model.ClassMeeting
 import dev.qarasky.unofficialkimep.data.model.FinalExam
+import dev.qarasky.unofficialkimep.data.model.MidtermMark
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
 import dev.qarasky.unofficialkimep.ui.components.LoadingState
 import dev.qarasky.unofficialkimep.ui.components.MessageState
 import dev.qarasky.unofficialkimep.vm.ScheduleViewModel
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
 private val weekOrder = listOf(
@@ -90,6 +107,7 @@ fun ScheduleScreen(
     scheduleCache: ScheduleCache,
     calendarRepository: CalendarRepository,
     reminderManager: ReminderManager,
+    midtermStore: MidtermStore,
     sessionId: String,
     modifier: Modifier = Modifier,
 ) {
@@ -99,11 +117,13 @@ fun ScheduleScreen(
             scheduleCache,
             calendarRepository,
             reminderManager,
+            midtermStore,
             sessionId,
         ),
     )
     val state = viewModel.uiState
-    var showFinals by rememberSaveable { mutableStateOf(false) }
+    // 0 = Classes, 1 = Finals, 2 = Midterms
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected: CourseDetail? by remember { mutableStateOf(null) }
 
     when {
@@ -126,25 +146,32 @@ fun ScheduleScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 FilterChip(
-                    selected = !showFinals,
-                    onClick = {
-                        showFinals = false
-                    },
+                    selected = tab == 0,
+                    onClick = { tab = 0 },
                     label = { Text("Classes") },
                 )
                 FilterChip(
-                    selected = showFinals,
-                    onClick = {
-                        showFinals = true
-                    },
+                    selected = tab == 1,
+                    onClick = { tab = 1 },
                     label = { Text("Finals") },
+                )
+                FilterChip(
+                    selected = tab == 2,
+                    onClick = { tab = 2 },
+                    label = { Text("Midterms") },
                 )
             }
 
-            if (showFinals) {
+            if (tab == 1) {
                 FinalsList(state.finals)
+            } else if (tab == 2) {
+                MidtermsList(
+                    windows = state.midtermWindows,
+                    marks = state.marks,
+                    onRemove = viewModel::removeMark,
+                )
             } else {
-                state.midterm?.let { MidtermBanner(it) }
+                NoticeBanners(state.notices)
                 PullToRefreshBox(
                     isRefreshing = state.refreshing,
                     onRefresh = {
@@ -161,6 +188,8 @@ fun ScheduleScreen(
                     } else {
                         ScheduleList(
                             meetings = state.meetings,
+                            daysOff = state.daysOff,
+                            marks = state.marks,
                             onSelect = { selected = CourseDetail.Scheduled(it) },
                         )
                     }
@@ -169,6 +198,7 @@ fun ScheduleScreen(
             CourseDetailSheet(
                 detail = selected,
                 gpa = dev.qarasky.unofficialkimep.data.model.GpaCredits(),
+                midtermStore = midtermStore,
                 onDismiss = { selected = null },
             )
         }
@@ -176,7 +206,12 @@ fun ScheduleScreen(
 }
 
 @Composable
-private fun ScheduleList(meetings: List<ClassMeeting>, onSelect: (ClassMeeting) -> Unit) {
+private fun ScheduleList(
+    meetings: List<ClassMeeting>,
+    daysOff: Map<LocalDate, DayOff>,
+    marks: List<MidtermMark>,
+    onSelect: (ClassMeeting) -> Unit,
+) {
     val grouped = remember(meetings) {
         meetings
             .groupBy { it.weekDay }
@@ -187,6 +222,10 @@ private fun ScheduleList(meetings: List<ClassMeeting>, onSelect: (ClassMeeting) 
             }
     }
     val todayName = remember { LocalDate.now().dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH) }
+    // This week's date for each weekday, so days off and marked midterms can be shown in place.
+    val weekStart = remember { LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }
+    fun dateOf(day: String): LocalDate? =
+        weekdayIndex(day).takeIf { it < weekOrder.size }?.let { weekStart.plusDays(it.toLong()) }
     val semester = meetings.firstOrNull()?.semester?.takeIf { it.isNotBlank() }
     val dateFrom = ApiDate.formatDate(meetings.firstOrNull()?.dateFrom)
     val dateTo = ApiDate.formatDate(meetings.firstOrNull()?.dateTo)
@@ -211,14 +250,27 @@ private fun ScheduleList(meetings: List<ClassMeeting>, onSelect: (ClassMeeting) 
         }
         grouped.forEach { (day, classes) ->
             val isToday = day.equals(todayName, ignoreCase = true)
-            item(key = "day_$day") { DayHeader(day, isToday) }
-            items(classes, key = { it.id }) { ClassCard(it, isToday, onClick = { onSelect(it) }) }
+            val dayOff = dateOf(day)?.let { daysOff[it] }
+            item(key = "day_$day") { DayHeader(day, isToday, dayOff) }
+            items(classes, key = { it.id }) { meeting ->
+                val key = MidtermMark.courseKey(meeting)
+                val midterm = marks.firstOrNull { m ->
+                    m.courseKey == key && m.localDate.let { d -> d != null && !d.isBefore(weekStart) && d.isBefore(weekStart.plusDays(7)) }
+                }
+                ClassCard(
+                    meeting = meeting,
+                    isToday = isToday,
+                    dimmed = dayOff != null,
+                    midtermLabel = midterm?.localDate?.let { "Midterm ${shortDay.format(it)}" },
+                    onClick = { onSelect(meeting) },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun DayHeader(day: String, isToday: Boolean) {
+private fun DayHeader(day: String, isToday: Boolean, dayOff: DayOff?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -247,36 +299,227 @@ private fun DayHeader(day: String, isToday: Boolean) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun MidtermBanner(label: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
+        if (dayOff != null) {
             Spacer(Modifier.width(8.dp))
-            Text(text = "Midterm week · $label", style = MaterialTheme.typography.bodyMedium)
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                shape = RoundedCornerShape(6.dp),
+            ) {
+                Text(
+                    text = "No classes · ${dayOff.title}",
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ClassCard(meeting: ClassMeeting, isToday: Boolean, onClick: () -> Unit) {
+private fun NoticeBanners(notices: List<ScheduleNotice>) {
+    if (notices.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        notices.forEach { NoticeBanner(it) }
+    }
+}
+
+@Composable
+private fun NoticeBanner(notice: ScheduleNotice) {
+    val (container, content, icon) = when (notice.kind) {
+        NoticeKind.MidtermWeek -> Triple(
+            MaterialTheme.colorScheme.tertiaryContainer,
+            MaterialTheme.colorScheme.onTertiaryContainer,
+            Icons.Filled.Timer,
+        )
+        NoticeKind.MidtermsMayStart -> Triple(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer,
+            Icons.Filled.Timer,
+        )
+        NoticeKind.DayOff -> Triple(
+            MaterialTheme.colorScheme.errorContainer,
+            MaterialTheme.colorScheme.onErrorContainer,
+            Icons.Filled.EventBusy,
+        )
+        NoticeKind.MarkedMidterm -> Triple(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
+            Icons.Filled.Flag,
+        )
+    }
+    Surface(
+        color = container,
+        contentColor = content,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(text = notice.title, style = MaterialTheme.typography.bodyMedium)
+                notice.detail?.let {
+                    Text(text = it, style = MaterialTheme.typography.bodySmall, color = content.copy(alpha = 0.8f))
+                }
+            }
+        }
+    }
+}
+
+private val shortDay: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH)
+
+@Composable
+private fun MidtermsList(
+    windows: List<MidtermWindow>,
+    marks: List<MidtermMark>,
+    onRemove: (MidtermMark) -> Unit,
+) {
+    val today = remember { LocalDate.now() }
+    LazyColumn(
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item(key = "marks_header") {
+            Text(
+                text = "Your midterm dates",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (marks.isEmpty()) {
+            item(key = "marks_empty") {
+                Text(
+                    text = "Nothing marked yet. Open a class on the Classes tab and choose “Mark midterm date”.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        items(marks.sortedBy { it.date }, key = { "${it.courseKey}|${it.date}" }) { mark ->
+            val date = mark.localDate
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                modifier = Modifier.alpha(if (date != null && date.isBefore(today)) 0.55f else 1f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(mark.courseTitle, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (date != null) {
+                            val days = ChronoUnit.DAYS.between(today, date)
+                            val relative = when {
+                                days == 0L -> "today"
+                                days == 1L -> "tomorrow"
+                                days > 1 -> "in $days days"
+                                else -> "passed"
+                            }
+                            Text(
+                                text = "${shortDay.format(date)} · $relative",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    IconButton(onClick = { onRemove(mark) }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Remove ${mark.courseTitle} midterm date")
+                    }
+                }
+            }
+        }
+
+        if (windows.isNotEmpty()) {
+            item(key = "weeks_header") {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Midterm weeks this semester",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(windows.map { it.round }.distinct(), key = { "round_$it" }) { round ->
+                val early = windows.firstOrNull { it.round == round && it.phase == MidtermPhase.Early }
+                val official = windows.firstOrNull { it.round == round && it.phase == MidtermPhase.Official }
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Midterms ${round}", style = MaterialTheme.typography.titleMedium)
+                        early?.let { WindowRow("Some professors start", it, today) }
+                        official?.let { WindowRow("Official midterm week", it, today) }
+                        (official ?: early)?.let {
+                            Text(
+                                text = "Progress grades due ${shortDay.format(it.deadline)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+            item(key = "weeks_note") {
+                Text(
+                    text = "Official weeks come from KIMEP's academic calendar: the week before progress " +
+                        "grades are due. Many professors begin a week earlier.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WindowRow(label: String, window: MidtermWindow, today: LocalDate) {
+    val now = window.contains(today)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = "${shortDay.format(window.start)} – ${shortDay.format(window.end)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (now) {
+            Surface(
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text("Now", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClassCard(
+    meeting: ClassMeeting,
+    isToday: Boolean,
+    dimmed: Boolean,
+    midtermLabel: String?,
+    onClick: () -> Unit,
+) {
     val accent = accentFor(meeting.courseId ?: meeting.title)
 
     Card(
         onClick = onClick,
+        modifier = Modifier.alpha(if (dimmed) 0.5f else 1f),
         shape = RoundedCornerShape(20.dp),
         border = if (isToday) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
@@ -332,18 +575,35 @@ private fun ClassCard(meeting: ClassMeeting, isToday: Boolean, onClick: () -> Un
                     ?.let { MetaRow(Icons.Filled.LocationOn, it, secondaryColor) }
                 meeting.instructor?.takeIf { it.isNotBlank() }
                     ?.let { MetaRow(Icons.Filled.Person, it, secondaryColor) }
-                meeting.section?.takeIf { it.isNotBlank() }?.let { section ->
+                if (meeting.section?.isNotBlank() == true || midtermLabel != null) {
                     Spacer(Modifier.height(10.dp))
-                    Surface(
-                        color = contentColor.copy(alpha = 0.12f),
-                        contentColor = contentColor,
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Text(
-                            text = "Section $section",
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        meeting.section?.takeIf { it.isNotBlank() }?.let { section ->
+                            Surface(
+                                color = contentColor.copy(alpha = 0.12f),
+                                contentColor = contentColor,
+                                shape = RoundedCornerShape(8.dp),
+                            ) {
+                                Text(
+                                    text = "Section $section",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                )
+                            }
+                        }
+                        midtermLabel?.let { label ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiary,
+                                contentColor = MaterialTheme.colorScheme.onTertiary,
+                                shape = RoundedCornerShape(8.dp),
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }

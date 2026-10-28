@@ -33,7 +33,9 @@ import dev.qarasky.unofficialkimep.data.CalendarRepository
 import dev.qarasky.unofficialkimep.data.KimepRepository
 import dev.qarasky.unofficialkimep.data.ScheduleCache
 import dev.qarasky.unofficialkimep.data.SessionState
+import dev.qarasky.unofficialkimep.data.MidtermStore
 import dev.qarasky.unofficialkimep.data.SettingsStore
+import dev.qarasky.unofficialkimep.data.calendar.CalendarImporter
 import dev.qarasky.unofficialkimep.data.export.CalendarExporter
 import dev.qarasky.unofficialkimep.data.notify.ReminderManager
 
@@ -49,6 +51,8 @@ fun MainScreen(
     settingsStore: SettingsStore,
     reminderManager: ReminderManager,
     calendarExporter: CalendarExporter,
+    midtermStore: MidtermStore,
+    calendarImporter: CalendarImporter,
     onLogout: () -> Unit,
 ) {
     val destinations = listOf(
@@ -126,6 +130,8 @@ fun MainScreen(
                     settingsStore = settingsStore,
                     reminderManager = reminderManager,
                     calendarExporter = calendarExporter,
+                    calendarImporter = calendarImporter,
+                    calendarRepository = calendarRepository,
                     sessionId = session.id,
                     onOpenPrivacy = { showPrivacy = true },
                 )
@@ -136,6 +142,7 @@ fun MainScreen(
                         scheduleCache = scheduleCache,
                         calendarRepository = calendarRepository,
                         reminderManager = reminderManager,
+                        midtermStore = midtermStore,
                         sessionId = session.id,
                     )
 

@@ -14,17 +14,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import dev.qarasky.unofficialkimep.data.ApiDate
 import dev.qarasky.unofficialkimep.data.Grading
 import dev.qarasky.unofficialkimep.data.CalculatorSettings
+import dev.qarasky.unofficialkimep.data.MidtermStore
 import dev.qarasky.unofficialkimep.data.SettingsStore
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -51,6 +57,12 @@ import dev.qarasky.unofficialkimep.data.model.AssessmentScore
 import dev.qarasky.unofficialkimep.data.model.ClassMeeting
 import dev.qarasky.unofficialkimep.data.model.FinalGrade
 import dev.qarasky.unofficialkimep.data.model.GpaCredits
+import dev.qarasky.unofficialkimep.data.model.MidtermMark
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** What the course bottom sheet shows. One entry point per tappable card. */
 sealed interface CourseDetail {
@@ -74,6 +86,7 @@ fun CourseDetailSheet(
     gpa: GpaCredits,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    midtermStore: MidtermStore? = null,
 ) {
     if (detail == null) return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -93,7 +106,7 @@ fun CourseDetailSheet(
             when (detail) {
                 is CourseDetail.Current -> CurrentContent(detail.score, gpa)
                 is CourseDetail.Completed -> CompletedContent(detail.grade, gpa)
-                is CourseDetail.Scheduled -> ScheduledContent(detail.meeting)
+                is CourseDetail.Scheduled -> ScheduledContent(detail.meeting, midtermStore)
             }
         }
     }
@@ -256,7 +269,7 @@ private fun CompletedContent(grade: FinalGrade, gpa: GpaCredits) {
 }
 
 @Composable
-private fun ScheduledContent(meeting: ClassMeeting) {
+private fun ScheduledContent(meeting: ClassMeeting, midtermStore: MidtermStore?) {
     SheetTitle(meeting.title, meeting.courseId)
     meeting.hall?.takeIf { it.isNotBlank() }?.let {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -289,6 +302,88 @@ private fun ScheduledContent(meeting: ClassMeeting) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+    if (midtermStore != null) MidtermSection(meeting, midtermStore)
+}
+
+private val midtermDay: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.ENGLISH)
+
+/** Lets the student mark the day(s) of this course's midterms; KIMEP doesn't publish them. */
+@Composable
+private fun MidtermSection(meeting: ClassMeeting, store: MidtermStore) {
+    val scope = rememberCoroutineScope()
+    val marks by store.marks.collectAsStateWithLifecycle(initialValue = emptyList())
+    val key = MidtermMark.courseKey(meeting)
+    val mine = marks
+        .filter { it.courseKey == key && (meeting.semester.isBlank() || it.semester == meeting.semester) }
+        .sortedBy { it.date }
+    var picking by remember { mutableStateOf(false) }
+
+    Text(
+        text = "Midterm dates",
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+    if (mine.isEmpty()) {
+        Text(
+            text = "Your professor sets this course's midterm dates. Mark them here to see them on the Schedule, under Midterms, and in your calendar export.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    mine.forEach { mark ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = mark.localDate?.let { midtermDay.format(it) } ?: mark.date,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { scope.launch { store.remove(mark) } }) { Text("Remove") }
+        }
+    }
+    OutlinedButton(onClick = { picking = true }) { Text("Mark midterm date") }
+
+    if (picking) {
+        MidtermDatePicker(
+            meeting = meeting,
+            onDismiss = { picking = false },
+            onPick = { date ->
+                picking = false
+                scope.launch { store.add(MidtermMark(key, meeting.title, meeting.semester, date.toString())) }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MidtermDatePicker(meeting: ClassMeeting, onDismiss: () -> Unit, onPick: (LocalDate) -> Unit) {
+    val from = remember(meeting) { ApiDate.localDate(meeting.dateFrom) }
+    val to = remember(meeting) { ApiDate.localDate(meeting.dateTo) }
+    // Only days inside the semester are offered. The picker works in UTC midnights.
+    val state = rememberDatePickerState(
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                val day = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                return (from == null || !day.isBefore(from)) && (to == null || !day.isAfter(to))
+            }
+        },
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = state.selectedDateMillis != null,
+                onClick = {
+                    state.selectedDateMillis?.let {
+                        onPick(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate())
+                    }
+                },
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    ) {
+        DatePicker(state = state)
     }
 }
 

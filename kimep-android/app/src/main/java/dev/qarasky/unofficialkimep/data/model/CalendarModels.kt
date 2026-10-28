@@ -17,7 +17,21 @@ data class CalendarYear(
     val title: String = "",
     val semesters: List<CalendarSemester> = emptyList(),
     val closed: List<CalendarClosure> = emptyList(),
-)
+    /** [SOURCE_PDF], [SOURCE_IMPORTED] or [SOURCE_MANUAL]; empty in older data. */
+    val source: String = "",
+) {
+    /** Hand-typed from a scanned PDF, so worth double-checking against KIMEP's own copy. */
+    val isManual: Boolean get() = source == SOURCE_MANUAL
+
+    companion object {
+        /** Parsed from the PDF at build time by tools/parse_calendar.py. */
+        const val SOURCE_PDF = "pdf"
+        /** Parsed from the PDF on this device. */
+        const val SOURCE_IMPORTED = "imported"
+        /** Transcribed by hand because KIMEP published only a scanned image. */
+        const val SOURCE_MANUAL = "manual"
+    }
+}
 
 @Serializable
 data class CalendarSemester(

@@ -1,9 +1,11 @@
 package dev.qarasky.unofficialkimep.data.notify
 
+import dev.qarasky.unofficialkimep.data.CalendarRepository
 import dev.qarasky.unofficialkimep.data.KimepRepository
 import dev.qarasky.unofficialkimep.data.SessionState
 import dev.qarasky.unofficialkimep.data.SessionStore
 import dev.qarasky.unofficialkimep.data.SettingsStore
+import dev.qarasky.unofficialkimep.data.calendar.DaysOff
 import kotlinx.coroutines.flow.first
 
 /**
@@ -16,6 +18,7 @@ class ReminderManager(
     private val sessionStore: SessionStore,
     private val settingsStore: SettingsStore,
     private val scheduler: ReminderScheduler,
+    private val calendarRepository: CalendarRepository,
 ) {
 
     suspend fun refresh() {
@@ -36,8 +39,11 @@ class ReminderManager(
         val lessonsEnabled = settings.lessonReminderHour || settings.lessonReminderTenMinutes
 
         val meetings = repository.schedule(session.id).getOrDefault(emptyList())
+        // No reminders for classes that don't happen (holidays, Study Break).
+        val daysOff = runCatching { DaysOff.build(calendarRepository.load()).keys }.getOrDefault(emptySet())
         scheduler.rescheduleLessons(
             meetings = meetings,
+            daysOff = daysOff,
             previousIds = previousMeetings,
             hourBefore = settings.lessonReminderHour,
             tenMinutesBefore = settings.lessonReminderTenMinutes,

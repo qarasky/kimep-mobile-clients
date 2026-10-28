@@ -35,6 +35,8 @@ class DemoActivity : ComponentActivity() {
                         settingsStore = container.settingsStore,
                         reminderManager = container.reminderManager,
                         calendarExporter = container.calendarExporter,
+                        midtermStore = container.midtermStore,
+                        calendarImporter = container.calendarImporter,
                         onLogout = { finish() },
                     )
                 }

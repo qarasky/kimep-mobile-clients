@@ -64,6 +64,14 @@ private fun PrivacyNoticeBody() {
             ),
         )
         NoticeSection(
+            title = "Academic calendar",
+            lines = listOf(
+                "The app ships with KIMEP's academic calendar. From June it also checks kimep.kz, at most once a day and only while it is missing the current or next year, and you can check manually in Settings → Academic calendar.",
+                "A new calendar PDF is downloaded from kimep.kz and read on your phone. Nothing about you is sent: the requests carry no student ID, session or grades.",
+                "Midterm dates you mark for a course are stored only on this device.",
+            ),
+        )
+        NoticeSection(
             title = "Update checks",
             lines = listOf(
                 "The app automatically checks GitHub for new releases at most once a day. You can also check manually in Settings → App updates. These requests do not include your student ID, session or grades.",
@@ -73,7 +81,7 @@ private fun PrivacyNoticeBody() {
         NoticeSection(
             title = "Your control",
             lines = listOf(
-                "Logging out clears your saved session and timetable and cancels reminders. Other local preferences remain.",
+                "Logging out clears your saved session, timetable and marked midterm dates, and cancels reminders. Other local preferences remain.",
                 "You can revoke the Calendar permission in Android Settings at any time. Events already added stay in your calendar until you delete them there.",
                 "To remove all local app data, use Android Settings → Apps → this app → Storage → Clear storage.",
                 "This is an unofficial app and is not affiliated with KIMEP University.",
